@@ -1,0 +1,12 @@
+---
+version: "v0.1.0-beta"
+hosts:
+  - hostname: "freyja-dhcp"
+    #wget 'https://cloud-images.ubuntu.com/releases/focal/release/ubuntu-20.04-server-cloudimg-amd64.img' -O /tmp/ubuntu-20.04-server-cloudimg-amd64.img
+    image: "/tmp/ubuntu-20.04-server-cloudimg-amd64.img"
+    os: "ubuntu20.04"
+    networks:
+      - name: "ctrl-plane"
+        address: "52:54:02:aa:aa:bb"
+    users:
+      - keys: ["$HOME/.ssh/id_rsa.pub"]

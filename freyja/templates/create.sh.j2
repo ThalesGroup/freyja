@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# constants
+BACKING_IMAGE="{{ image }}"
+IMAGE_DIR="{{ image_dir }}"
+IMAGE_FORMAT={{ image_format }}
+DISK_SIZE={{ disk if disk else 30 }}
+HOSTNAME="{{ hostname }}"
+MEMORY_SIZE={{ memory if memory else 4096 }}
+OS_VARIANT="{{ os }}"
+VCPUS_NUMBER={{ vcpus if vcpus else 2 }}
+
+# directory
+if [ ! -d "${IMAGE_DIR}" ]; then
+    mkdir -p "${IMAGE_DIR}"
+fi
+
+# A "$BACKING_IMAGE" is a cloud image template.
+backing_image_name=$(basename -- "${BACKING_IMAGE}")
+backing_image_ext="${backing_image_name##*.}"
+
+# "instanciated_image" is the virtual disk allocated by virt-install.
+# It will be used to run the virtual machine.
+# "instanciated_image" is created from backing image.
+instanciated_image="${IMAGE_DIR}/${HOSTNAME}_vdisk.${backing_image_ext}"
+
+# provisioning the virtual disk for the instanciated imageje  je
+{% if ignition %}
+# For ignition based OS we do not need to clone the backing image as
+# virt-install does it.
+ignition_file="{{provisioning_file}}"
+{% else %}
+# For cloud-init based OS we need to clone the backing image and then resize
+# the clone by end.
+# TODO: search if there is a way to use
+# "virt-install --disk `backing_store=myimage.img`" for cloud-init based OS.
+# 1. Clone the backing image.
+qemu-img create -f qcow2 -F qcow2 -b ${BACKING_IMAGE} ${instanciated_image} 1> /dev/null
+# 2. Resize the newly created clone of the backing image.
+qemu-img resize ${instanciated_image} +${DISK_SIZE}G 1> /dev/null
+# 3. Create cloud init config image
+cloud_init_image="${IMAGE_DIR}/${HOSTNAME}_cloud_init.iso"
+cloud-localds "${cloud_init_image}" "{{provisioning_file}}"
+{% endif %}
+
+# install
+virt-install \
+    --connect=qemu:///system \
+    --import \
+    --name "${HOSTNAME}" \
+    --memory "${MEMORY_SIZE}" \
+    --vcpus "${VCPUS_NUMBER}" \
+    --cpu host,+vmx \
+    --metadata description="${HOSTNAME}" \
+    --os-variant "${OS_VARIANT}" \
+    {% if ignition %}
+    --disk "path=${instanciated_image},format=qcow2,readonly=false,size=${DISK_SIZE},backing_store=${BACKING_IMAGE}" \
+    --qemu-commandline="-fw_cfg name=opt/com.coreos/config,file=${ignition_file}" \
+    {% else %}
+    --disk "path=${instanciated_image},readonly=false" \
+    --disk "${cloud_init_image},device=cdrom" \
+    {% endif %}
+    --hvm \
+    {% if not foreground %}
+    --graphics none \
+    --noautoconsole \
+    {% else %}
+    --graphics default \
+    --console pty,target_type=serial \
+    {% endif %}
+    {% if networks %}
+    {% for net in networks %}
+    --network network={{net.name}},mac={{net.address}}{% if not loop.last %} \{% endif +%}
+    {% endfor %}
+    {% endif %}
+
+exit 0

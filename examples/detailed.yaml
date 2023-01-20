@@ -1,0 +1,17 @@
+---
+version: "v0.1.0-beta"
+hosts:
+  - image: "/tmp/CentOS-Stream-GenericCloud-8-20210603.0.x86_64.qcow2" # MANDATORY
+    os: "centos8" # MANDATORY
+    hostname: "freyja-detailed" # MANDATORY, MUST NOT contain underscores
+    networks: # MANDATORY, at least one
+      - name: "ctrl-plane"
+        address: "52:54:02:aa:aa:bb"
+    users: # MANDATORY
+      - username: "libvirt"
+        password: "$5$Z5a4D.T37Spa.$y.4GEqGOFFxIqd4xxGMH3zvD74DNDProWrrZeYnfhvC" # 'master'. use 'mkpasswd'.
+        keys: ["$HOME/.ssh/id_rsa.pub"]
+    disk: 100 # Optional, default '30'
+    memory: 8192 # Optional, default '4096'
+    vcpus: 4 # Optional, default '2'
+    packages: [ "curl", "net-tools" ]

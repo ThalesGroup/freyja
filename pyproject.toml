@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "freyja"
+version = "0.1.0"
+description = "VM management utility tool"
+authors = ["kaio"]
+
+[tool.poetry.dependencies]
+python = "^3.9"
+typer = "^0.4.0"
+python-dotenv = "^0.19.2"
+pydantic = "^1.9.0"
+PyYAML = "^6.0"
+Jinja2 = "^3.0.3"
+pytest = "^7.0.1"
+pytest-dotenv = "^0.5.2"
+pytest-cov = "^3.0.0"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+freyja = "freyja.__main__:main"

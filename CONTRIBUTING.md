@@ -1,30 +1,29 @@
-Describe in this file:
+# CONTRIBUTING
 
-- team organization, roles, communication
-- the rules to be respected by your future contributors
+## CREATE AN ISSUE
 
-# Contributing guidelines
+To contribute to this project, start to create an issue.  
+The nature of this issue might be :
 
-## Team organization
+* A bug : describe the problems, the versions affected and how to reproduce it
+* A feature : describe the improvements, the version concerned and the specifications
 
-### Roles
+## CREATE A BRANCH
 
-## How to become a contributor
+Once the issue is created, create a new branch related to it.
+That means the new branch should :
 
-### Contributor License Agreements
+* Start from the branch of the related version. For a bug, start from the first version affected by this bug. For a feature, start from the version concerned by this feature.
+* Have a name containing the #number of the issue.
 
-### Contributing code
+## IMPLEMENT & COMMUNICATE
 
-## Pull Request Checklist
+Well ... now you have to do what you mentioned in the issue !  
+Speak with the maintainers or the developers, get advice and remain active.
 
-### License
+## CREATE A MERGE REQUEST
 
-### Coding style
-
-### Testing
-
-#### Running sanity check
-
-#### Running unit tests
-
-### Issues management
+Once you are done, test your implementation.  
+Squash your commits into fewer meaningful commits, then create a merge request.  
+Target the proper branch for this merge and describe how you tested it.  
+Finally, notify a maintainer to validate your merge request.

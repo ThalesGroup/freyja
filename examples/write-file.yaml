@@ -1,0 +1,15 @@
+---
+#wget 'https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-generic-amd64.qcow2' -O /tmp/ubuntu-20.04-server-cloudimg-amd64.img
+version: "v0.1.0-beta"
+hosts:
+  - hostname: "debian11-write-file"
+    image: "/tmp/debian-11-generic-amd64.qcow2"
+    os: "debian11"
+    users:
+      - keys: ["$HOME/.ssh/id_ed25519.pub"]
+        groups: ["sudo"]
+    write-files:
+      - source: /tmp/issou.txt
+        destination: /etc/hello.txt
+        permissions: "0660"
+        owner: "root:root"

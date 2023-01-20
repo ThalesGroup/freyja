@@ -1,0 +1,30 @@
+# IDE intellij
+.idea
+*.iml
+
+# Project
+logs
+bin
+.build
+
+# python
+**/__pycache__/
+__pycache__/
+*.py[cod]
+out
+.pytest_cache
+.coverage
+*cov/
+
+# Docs
+**/*.bkp
+**/*.dtmp
+pages/node_modules/
+pages/build/
+pages/.docusaurus
+pages/.cache-loader
+pages/.DS_Store
+pages/.env.local
+pages/npm-debug.log*
+pages/yarn-debug.log*
+pages/yarn-error.log*

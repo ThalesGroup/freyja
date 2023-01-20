@@ -1,0 +1,85 @@
+{# WARNING: this file must starts with '#cloud-config' and not '# cloud config' or anything else #}
+{# Otherwise, this file will not work #}
+#cloud-config
+hostname: {{hostname}}
+
+# Configure where output will go
+output:
+  all: ">> /var/log/cloud-init.log"
+
+{% set at_least_one = {'keys': False} %}
+{% set users = users if users else [{'default': {}}] %}
+users:
+  {% for user in users %}
+  - name: "{{ user.username }}"
+    sudo: [ 'ALL=(ALL) NOPASSWD:ALL' ]
+    lock_passwd: false
+    shell: /bin/bash
+    passwd: "{{ user.password }}"
+    {% if user.groups %}
+    groups: {{ user.groups | join(", ") }}
+    {% endif %}
+    {% if user.ssh_keys_contents %}
+    {% if at_least_one.update({'keys': True}) %}{%endif%}
+    ssh_authorized_keys:
+      {% for ssh_key_content in user.ssh_keys_contents %}
+      - {{ ssh_key_content -}}
+      {% endfor %}
+    {% endif %}
+      
+  {% endfor %}
+
+{% if at_least_one.get('keys') %}
+# Install my public ssh key to the first user configured
+# in cloud.cfg in the template (which is centos for CentOS cloud images)
+ssh_authorized_keys:
+  {% for user in users %}
+  {% for ssh_key_content in user.ssh_keys_contents %}
+  - {{ssh_key_content-}}
+  {% endfor %}
+  {% endfor %}
+{% endif %}
+
+package_update: {{update}}
+package_upgrade: {{update}}
+
+{% if packages %}
+packages:
+  {% for package in packages %}
+  - {{package}}
+  {% endfor %}
+{% endif %}
+
+{% if write_files %}
+write_files:
+{% for file in write_files %}
+  - content: {{ file.content }}
+    encoding: base64
+    path: {{file.destination}}
+    permissions: "{{file.permissions}}"
+    owner: "{{file.owner}}"
+{% endfor %}
+{% endif %}
+
+# Remove cloud-init
+runcmd:
+  - systemctl stop network && systemctl start network
+{% if update %}
+  - yum -y remove cloud-init
+  - yum update
+{% endif %}
+{% if runcmd %}
+{% for cmd in runcmd %}
+  - {{cmd}}
+{% endfor %}
+{% endif %}
+
+final_message: "The system is finally up, after $UPTIME seconds"
+
+{% if reboot %}
+power_state:
+  mode: reboot
+  message: First reboot
+  timeout: 30
+  condition: True
+{% endif %}

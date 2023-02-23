@@ -6,6 +6,7 @@
 logs
 bin
 .build
+.dist
 
 # python
 **/__pycache__/

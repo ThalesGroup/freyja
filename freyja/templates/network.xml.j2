@@ -1,6 +1,14 @@
 <network>
   <name>{{name}}</name>
   <uuid>{{uuid}}</uuid>
+  {% if bridge %}
   <forward mode="bridge"/>
-  <bridge name="{{interface if interface else 'virbr0' }}"/>
+  <bridge name="{{bridge}}"/>
+  {% elif interface %}
+  <forward mode="nat" dev="{{interface}}"/>
+  {% else %}
+  {# default mode is using the libvirt's bridge #}
+  <forward mode="bridge"/>
+  <bridge name="virbr0"/>
+  {% endif %}
 </network>

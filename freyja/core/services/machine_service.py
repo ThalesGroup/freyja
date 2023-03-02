@@ -131,12 +131,10 @@ def list_machines(names: bool = False, stdout: bool = True) -> "List[str]":
     return execute(cmd, stream_stdout=stdout)
 
 
-def parse_machines_network_info(domain: str, domiflist: List[Dict[str, str]]) \
-        -> "List[machine_info.Network]":
+def parse_machines_network_info(domiflist: List[Dict[str, str]]) -> "List[machine_info.Network]":
     """
     Parse domain's domiflist and domifaddr and network information into a list of Networks info
     models
-    :param domain: domain name
     :param domiflist: raw domiflist dictionary output from libvirt
     :return: the resulting Info model
     """
@@ -167,17 +165,15 @@ def parse_machines_network_info(domain: str, domiflist: List[Dict[str, str]]) \
     return result
 
 
-def parse_machines_info(domain: str, dominfo: Dict[str, str], domiflist: List[Dict[str, str]]) \
+def parse_machines_info(dominfo: Dict[str, str], domiflist: List[Dict[str, str]]) \
         -> "Info":
     """
     Parse domain's dominfo and network information to the Info model
-    :param domain: domain name
-    :param dominfo: raw dominfo dictionary output from libvirt
     :param domiflist: raw domiflist dictionary output from libvirt
     :return: the resulting Info model
     """
     # parse networks information domiflist and domifaddr for this domain
-    networks = parse_machines_network_info(domain, domiflist)
+    networks = parse_machines_network_info(domiflist)
     # parse memory information for this domain
     # convert max memory display '4194304 KiB' into a human-readable format in GB
     kib_mem = str(dominfo.get(machine_info.mapping.get("memory")))
@@ -203,7 +199,7 @@ def get_domain_info(domain: str) -> "Info":
     domiflist_raw = execute(["virsh", "domiflist", domain])
     domiflist: List[Dict[str, str]] = parse_list(domiflist_raw)
 
-    return parse_machines_info(domain, dominfo, domiflist)
+    return parse_machines_info(dominfo, domiflist)
 
 
 def info_machines(names: List[str]) -> "Dict":

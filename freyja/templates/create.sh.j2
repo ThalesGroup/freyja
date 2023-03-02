@@ -72,6 +72,8 @@ virt-install \
     {% for net in networks %}
     --network network={{net.name}},mac={{net.address}}{% if not loop.last %} \{% endif +%}
     {% endfor %}
+    {% else %}
+    --network default
     {% endif %}
 
 exit 0

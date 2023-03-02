@@ -19,8 +19,6 @@ function check_requirement(){
 # MAIN
 #
 
-check_requirement poetry --version "Install poetry first"
-
 cd "${PROJECT_DIR}" || exit
 pyversion=$(python --version)
 echo "Install Freyja for: ${pyversion}"

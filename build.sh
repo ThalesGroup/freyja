@@ -28,12 +28,12 @@ poetry env info
 echo ""
 echo "Update dependencies"
 poetry check
-poetry update
-poetry install
+poetry update --without dev
+poetry install --without dev --sync
 
 echo "Build Freyja"
 rm -rf "${PROJECT_DIR}/dist"
-poetry build
+poetry build --format wheel
 
 echo "Built in dist/:"
 ls "./dist/"

@@ -1,3 +1,6 @@
+import grp
+import os
+import pwd
 from pathlib import Path
 
 
@@ -19,6 +22,7 @@ class FreyjaEnvironment:
     CLOUD_INIT_TEMPLATE_NAME = CLOUD_INIT_FILENAME + ".j2"
     IGNITION_TEMPLATE_NAME = IGNITION_FILENAME + ".j2"
     NETWORK_TEMPLATE_NAME = NETWORK_FILENAME + ".j2"
+    GROUP_NAME_PERMISSION = "libvirt-qemu"
 
     @classmethod
     def get_version(cls):
@@ -28,3 +32,7 @@ class FreyjaEnvironment:
     def init(cls):
         if not cls.BUILD_DIR.exists():
             cls.BUILD_DIR.mkdir(parents=True)
+            # change group access rights to allow libvirt to access to the freyja workspace
+            uid = pwd.getpwnam(os.getlogin()).pw_uid
+            gid = grp.getgrnam(cls.GROUP_NAME_PERMISSION).gr_gid
+            os.chown(cls.BUILD_DIR, uid, gid)

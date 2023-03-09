@@ -1,29 +1,47 @@
 # CONTRIBUTING
 
-## CREATE AN ISSUE
+## Contributor License Agreements
 
-To contribute to this project, start to create an issue.  
-The nature of this issue might be :
+This repository use the Apache-2.0 license.
 
-* A bug : describe the problems, the versions affected and how to reproduce it
-* A feature : describe the improvements, the version concerned and the specifications
+## Contributing repo
 
-## CREATE A BRANCH
+To contribute to this project, start creating an issue.
 
-Once the issue is created, create a new branch related to it.
-That means the new branch should :
+Once the issue is created, create a new branch or a new fork related to it and push your modification
+inside.
 
-* Start from the branch of the related version. For a bug, start from the first version affected by this bug. For a feature, start from the version concerned by this feature.
-* Have a name containing the #number of the issue.
+Speak with the maintainers and the developers, get advice and remain active.
 
-## IMPLEMENT & COMMUNICATE
+## Contributing code
 
-Well ... now you have to do what you mentioned in the issue !  
-Speak with the maintainers or the developers, get advice and remain active.
+Install Poetry to contribute to the implementation. Use poetry to add new dependency or to run python
+tests.
 
-## CREATE A MERGE REQUEST
+## Pull Request Checklist
 
-Once you are done, test your implementation.  
-Squash your commits into fewer meaningful commits, then create a merge request.  
-Target the proper branch for this merge and describe how you tested it.  
-Finally, notify a maintainer to validate your merge request.
+- Test your implementation and verify it with the [SECURITY.md](./SECURITY.md) documentation.  
+- Squash your commits into fewer meaningful commits, then create a pull request.
+- Notify a maintainer to validate.
+
+### Testing
+
+#### Running sanity check
+
+Use a linter to scan your source code.
+
+A linter will be use by a maintainer to verify the quality of your code.
+
+#### Running unit tests
+
+```sh
+poetry run pytest --cov=freyja freyja/tests/
+```
+
+#### Running vulnerability scanner
+
+You should run a vulnerability scanner every time you add a new dependency in projects :
+
+```sh
+poetry run -m python safety check
+```

@@ -11,18 +11,10 @@ Meanwhile, read the documentation [here](./docs)
 * Python (version >= 3.9)
 * Poetry (version >= 1.3.2)
 
-## TEST
-
-```sh
-poetry run python -m pytest --cov=freyja freyja/tests/
-```
-
 ## BUILD
 
 ```sh
-poetry update
-poetry check
-poetry build
+./build.sh
 ```
 
 ## CORE TEAM

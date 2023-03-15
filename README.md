@@ -4,7 +4,7 @@
 
 Github Pages coming soon !
 
-Meanwhile, read the documentation [here](./pages/docs)
+Meanwhile, read the documentation [here](./docs)
 
 ## DEVELOPMENT REQUIREMENTS
 

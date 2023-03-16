@@ -25,13 +25,28 @@ class WriteFile(BaseModel):
     owner: Optional[str] = "root:root"
 
 
+class Sysroot(BaseModel):
+    size: Optional[int] = 30
+
+
+class AdditionalDisk(BaseModel):
+    size: int
+    mount: Optional[str]
+    readonly: Optional[bool] = Field(False, alias="read-only")
+
+
+class Disks(BaseModel):
+    sysroot: Optional[Sysroot] = Sysroot()
+    additional: Optional[List[AdditionalDisk]]
+
+
 class MachineConfiguration(BaseModel):
     image: str
     os: str
     hostname: str
     networks: Optional[List[NetworkConfiguration]]
     users: List[User] = [User()]
-    disk: Optional[int] = 30
+    disks: Optional[Disks]
     memory: Optional[int] = 4096
     vcpus: Optional[int] = 2
     packages: Optional[List[str]]

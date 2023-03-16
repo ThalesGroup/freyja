@@ -4,46 +4,54 @@
 BACKING_IMAGE="{{ image }}"
 IMAGE_DIR="{{ image_dir }}"
 IMAGE_FORMAT={{ image_format }}
-DISK_SIZE={{ disk if disk else 30 }}
+DISK_SIZE={{ disks.sysroot.size }}
 HOSTNAME="{{ hostname }}"
-MEMORY_SIZE={{ memory if memory else 4096 }}
+MEMORY_SIZE={{ memory }}
 OS_VARIANT="{{ os }}"
-VCPUS_NUMBER={{ vcpus if vcpus else 2 }}
+VCPUS_NUMBER={{ vcpus }}
 
 # directory
 if [ ! -d "${IMAGE_DIR}" ]; then
     mkdir -p "${IMAGE_DIR}"
 fi
 
+# SYSROOT DISK
 # A "$BACKING_IMAGE" is a cloud image template.
 backing_image_name=$(basename -- "${BACKING_IMAGE}")
 backing_image_ext="${backing_image_name##*.}"
+backing_image_ext=img
 
-# "instanciated_image" is the virtual disk allocated by virt-install.
+# "instantiated_image" is the virtual disk allocated by virt-install.
 # It will be used to run the virtual machine.
-# "instanciated_image" is created from backing image.
-instanciated_image="${IMAGE_DIR}/${HOSTNAME}_vdisk.${backing_image_ext}"
+# "instantiated_image" is created from the backing image.
+instantiated_image="${IMAGE_DIR}/${HOSTNAME}_vdisk.${backing_image_ext}"
 
-# provisioning the virtual disk for the instanciated imageje  je
+# provisioning the virtual disk for the instantiated image
 {% if ignition %}
 # For ignition based OS we do not need to clone the backing image as
 # virt-install does it.
 ignition_file="{{provisioning_file}}"
 {% else %}
-# For cloud-init based OS we need to clone the backing image and then resize
-# the clone by end.
-# TODO: search if there is a way to use
-# "virt-install --disk `backing_store=myimage.img`" for cloud-init based OS.
-# 1. Clone the backing image.
-qemu-img create -f qcow2 -F qcow2 -b ${BACKING_IMAGE} ${instanciated_image} 1> /dev/null
-# 2. Resize the newly created clone of the backing image.
-qemu-img resize ${instanciated_image} +${DISK_SIZE}G 1> /dev/null
-# 3. Create cloud init config image
+# For cloud-init based OS we need to clone the backing image and then resize the clone.
+# 1. Clone and resize the backing image for sysroot disk.
+qemu-img create -f qcow2 -F qcow2 -b ${BACKING_IMAGE} ${instantiated_image} 1> /dev/null
+qemu-img resize ${instantiated_image} +${DISK_SIZE}G 1> /dev/null
+# 2. Create cloud init config image
+#    Cloud init uses a disk image to provision the virtual machine
 cloud_init_image="${IMAGE_DIR}/${HOSTNAME}_cloud_init.iso"
 cloud-localds "${cloud_init_image}" "{{provisioning_file}}"
 {% endif %}
 
-# install
+{% if disks.additional %}
+# ADDITIONAL DISKS
+# Create one new disk image per additional disk in configuration
+{% for ad in disks.additional %}
+disk_{{loop.index}}="${IMAGE_DIR}/${HOSTNAME}_add_disk_{{loop.index}}.${backing_image_ext}"
+qemu-img create "${disk_{{loop.index}}}" {{ad.size}}G -f qcow2
+{% endfor %}
+{% endif %}
+
+# INSTALL
 virt-install \
     --connect=qemu:///system \
     --import \
@@ -54,11 +62,16 @@ virt-install \
     --metadata description="${HOSTNAME}" \
     --os-variant "${OS_VARIANT}" \
     {% if ignition %}
-    --disk "path=${instanciated_image},format=qcow2,readonly=false,size=${DISK_SIZE},backing_store=${BACKING_IMAGE}" \
+    --disk "path=${instantiated_image},format=qcow2,readonly=false,size=${DISK_SIZE},backing_store=${instantiated_image}" \
     --qemu-commandline="-fw_cfg name=opt/com.coreos/config,file=${ignition_file}" \
     {% else %}
-    --disk "path=${instanciated_image},readonly=false" \
     --disk "${cloud_init_image},device=cdrom" \
+    --disk "path=${instantiated_image},readonly=false" \
+    {% if disks.additional %}
+    {% for ad in disks.additional %}
+    --disk "path=${disk_{{loop.index}}},size={{ad.size}},backing_store=${disk_{{loop.index}}}" \
+    {% endfor %}
+    {% endif %}
     {% endif %}
     --hvm \
     {% if not foreground %}

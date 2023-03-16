@@ -47,7 +47,7 @@ cloud-localds "${cloud_init_image}" "{{provisioning_file}}"
 # Create one new disk image per additional disk in configuration
 {% for ad in disks.additional %}
 disk_{{loop.index}}="${IMAGE_DIR}/${HOSTNAME}_add_disk_{{loop.index}}.${backing_image_ext}"
-qemu-img create "${disk_{{loop.index}}}" {{ad.size}}G -f qcow2
+qemu-img create "${disk_{{loop.index}}}" {{ad.size}}G -f qcow2 1> /dev/null
 {% endfor %}
 {% endif %}
 

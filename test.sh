@@ -2,31 +2,20 @@
 
 SCRIPT_PATH="$(realpath "$0")"
 PROJECT_DIR="$(dirname "${SCRIPT_PATH:?}")"
+TEST_DIR="${PROJECT_DIR}/freyja/tests"
+FREYJA_WORKSPACE="${HOME}/freyja-workspace"
+TEST_RESOURCES_DIR="${TEST_DIR}/resources"
+
+cd "${PROJECT_DIR}/freyja" || exit
 
 #
-# FUNCTIONS
+# RUNTIME
 #
 
-function check_requirement(){
-    if ! eval "$@" >> /dev/null 2>&1 ; then
-        echo "! Fatal : missing requirement"
-        if [ -n "${*: -1}" ]; then echo "${@: -1}"; fi
-        exit 1
-    fi
-}
-
-#
-# MAIN
-#
-
-cd "${PROJECT_DIR}" || exit
-pyversion=$(python --version)
-echo "Install Freyja for: ${pyversion}"
-
-echo ""
-wheel="$(find "./dist/" -type f -name "*.whl")"
-python -m pip install --upgrade pip
-python -m pip install "${wheel}" --force-reinstall
+# freyja-testing
+echo ". Testing full configuration"
+poetry run python "${PROJECT_DIR}/freyja/__main__.py" machine create -c "${TEST_RESOURCES_DIR}/testing.yaml" --foreground
+#rm -rf "${FREYJA_WORKSPACE}/build/freyja-testing"
 
 echo ""
 echo "OK"

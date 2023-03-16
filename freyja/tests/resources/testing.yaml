@@ -1,81 +1,43 @@
 ---
+# THIS FILE SHOULD ONLY BE USED FOR TESTING SCRIPTS
+# USE test.sh !!!
 version: "v0.1.0-beta"
 
 hosts:
-  - hostname: "debian11"
-    image: "/tmp/debian11"
+  - hostname: "freyja-testing"
+    image: "$HOME/Images/debian11"
     os: "debian11"
-    disk: 30
 
-    # Optional memory size of the guest
-    # Value in MB
-    memory: 4096
+    memory: 2048
+    vcpus: 1
+    disks:
+      sysroot:
+        size: 20
+      additional:
+        - size: 5
+          mount: "/media/disk1"
+          read-only: true
 
-    # Optional number of vcpus of the guest
-    vcpus: 2
-
-    # Optional List of unix accounts to create at boot
-    # All of these accounts will be created alongside their home directory
-    # The default is 'freyja:master' with no keys and no additional groups
     users:
-      # Optional unix account name
-      # will be created in a group of the same and with a home directory
-      - username: "freyja"
-        # Optional password value hashed in sha-256.
-        # use mkpasswd -m sha-256 to define yours
-        password: "$5$B.GSTERJDYuWJoV3$4koDNFgtRc137XVxw8jlcMyYo8lCbtyDT0bv.UA.ex6"
-        # Optional paths of ssh keys to inject in 'authorized_keys' file on the final guest
-        # useful to inject the ssh keys of your host during the guest boot phase
+      - username: "alice"
+        # 'changeit'
+        password: "$5$Z9hvWBu2Iofxe4UA$P8aqonOif2.V0OhE/6fu83trONYqHd.8JiO1d3gTKe3"
         keys: [ "$HOME/.ssh/id_ed25519.pub" ]
-        # Optional additional groups for the current unix account
         groups: [ "sudo" ]
 
-    # Optional list of subnetworks to create alongside the virtual machine in libvirt
-    # Default network is 'default' and a dynamic MAC address will be provided by libvirt
-    # By default, the defined networks will be attached to the libvirt bridge 'virbr0'
     networks:
-      # Mandatory name of the network domain to create in libvirt
-      # If this network does not exist yet, it will be created
-      # If this network already exists, it will be attached to the current virtual machine
-      - name: "default"
-        # Mandatory MAC address of the virtual machine inside the current subnetwork domain of libvirt
-        # The address must be unique in this network
-        address: "52:54:02:aa:aa:aa"
+      - name: "ctrl-plane-test"
+        address: "52:54:02:ff:ff:ff"
 
-    # Optional list of files to write on the guest filesystem at boot
     write-files:
-      # Mandatory source of the file on the host's filesystem
-      - source: "/tmp/file.txt"
-        # Mandatory destination of the file on the guest's filesystem
-        destination: "/etc/file.txt"
-        # Optional permissions of the final file on the guest's filesystem
-        permissions: "0600"
-        # Optional owner and group of the final file on the guest's filesystem
-        owner: "root:root"
+      - source: "tests/resources/write-file.txt"
+        destination: "/home/alice/write-file.txt"
+        permissions: "0666"
+        owner: "alice:alice"
 
-    # Optional configuration to update the guest system
-    # Happens before additional packages installation
-    update: false
-
-    # Optional list of additional packages to install at boot
-    packages: ["vim"]
-
-    # Optional list of commands to run at boot
-    # Happens after additional files injection and additional packages installation
-    # The default system's shell is used
+    packages: ["vim", "git"]
     runcmd:
-      - curl -fL https://get.k3s.io | sh -s - --write-kubeconfig-mode 644
+      - echo "hello world !" > /home/alice/file2.txt
 
-    # Optional configuration to reboot the gest at the very end of the boot phase
-    reboot: false
-
-    # Optional configuration for Ignition files
-    # If configured with no ignition file, the OS will be provisioned with the current configurations
-    #   defined above
-    ignition:
-      # Mandatory version of the Ignition's specification to use for provisioning the current guest
-      version: "3.3.0"
-      # Optional Ignition file to boot and provision the currest guest
-      # If configured, the options defined in this Ignition file will override the current configurations
-      #  defined above
-      file: "$HOME/freyja-conf/ignition.json"
+    update: true
+    reboot: true

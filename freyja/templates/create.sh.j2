@@ -69,7 +69,7 @@ virt-install \
     --disk "path=${instantiated_image},readonly=false" \
     {% if disks.additional %}
     {% for ad in disks.additional %}
-    --disk "path=${disk_{{loop.index}}},size={{ad.size}},backing_store=${disk_{{loop.index}}}" \
+    --disk "path=${disk_{{loop.index}}},size={{ad.size}},backing_store=${disk_{{loop.index}}},readonly={{ad.readonly}}" \
     {% endfor %}
     {% endif %}
     {% endif %}

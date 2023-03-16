@@ -15,7 +15,6 @@ hosts:
         size: 20
       additional:
         - size: 5
-          mount: "/media/disk1"
           read-only: true
 
     users:

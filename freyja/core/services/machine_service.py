@@ -352,3 +352,28 @@ def open_console_machine(domain: str):
         execute_interactive(["virsh", "console", domain])
     except ChildProcessError as e:
         logger.warning(f"Skip {domain}: Machine not found")
+       
+        
+def create_snapshot(domain: str, name:str):
+    try:
+        execute(["virsh", "snapshot-create-as", domain, "--name", name])
+    except ChildProcessError as e:
+        logger.warning(f"Skip {domain}: Machine not found")
+
+
+def restore_snapshot(domain: str, name:str):
+    try:
+        execute(["virsh", "snapshot-revert", domain, "--snapshotname", name])
+    except ChildProcessError as e:
+        if check_message(e, "snapshot"):
+            logger.warning(f"Skip {domain}: snapshot {name} not found")
+        else:
+            logger.warning(f"Skip {domain}: Machine not found")
+            
+
+def list_snapshot(domain:str):
+    try:
+        execute(["virsh", "snapshot-list", domain], stream_stdout=True)
+        
+    except ChildProcessError as e:
+        logger.warning(f"Skip {domain}: Machine not found")

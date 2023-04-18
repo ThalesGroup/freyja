@@ -133,3 +133,33 @@ def console(name: str = typer.Argument(..., help="VM name in which a console sho
     Opens a console in the specified machine
     """
     open_console_machine(name)
+    
+    
+@app.command()
+def restore(name: str = typer.Argument(..., help="VM name to restore"), snapshot: str = typer.Argument(..., help="Name of the snapshot")):
+    """
+    Restore a VM from a snapshot
+    """
+    restore_snapshot(name, snapshot)
+    logger.warning(f"The machine {name} will be restore to snapshot {snapshot}")
+    if yes_no_question("Are you sure ? (Y/n)[default: n]", False):
+        restore_snapshot(name, snapshot)
+        logger.info("OK")
+    else:
+        logger.info("Aborted")
+    
+    
+@app.command()
+def snapshot(name: str = typer.Argument(..., help="VM name to snapshot"), snapshot: str = typer.Argument(..., help="Name of the snapshot")):
+    """
+    Create a snapshot of a VM
+    """
+    create_snapshot(name, snapshot)
+    
+
+@app.command()
+def list_snapshots(name: str = typer.Argument(..., help="VM name to list snapshots")):
+    """
+    List snapshots of a VM
+    """
+    list_snapshot(name)

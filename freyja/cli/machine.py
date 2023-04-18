@@ -8,7 +8,7 @@ import yaml
 from freyja.core.services.machine_service import create_machines, delete_machines, info_machines, \
     list_machines, \
     restart_machines, start_machines, \
-    stop_machines, usage_machine
+    stop_machines, usage_machine, open_console_machine
 from freyja.lib.exceptions.configuration_exceptions import ConfigurationContentError, \
     ConfigurationFileNotFoundException, \
     ConfigurationFormatError
@@ -126,3 +126,10 @@ def usage(names: Optional[List[str]] = typer.Argument(None, help="VM names list 
     Display the virtual machines cpu and memory usage.
     """
     usage_machine(names, watch)
+
+@app.command()
+def console(name: str = typer.Argument(..., help="VM name in which a console should be opened")):
+    """
+    Opens a console in the specified machine
+    """
+    open_console_machine(name)

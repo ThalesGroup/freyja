@@ -59,6 +59,12 @@ freyja machine usage vm1 vm2 --watch
 freyja machine usage vm1
 ```
 
+Opens a console in a specific machine :
+
+```sh
+freyja machine console vm1
+```
+
 List mac addresses already in use :
 
 ```sh

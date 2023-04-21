@@ -12,7 +12,7 @@
 You should run a vulnerability scanner every time you add a new dependency in projects :
 
 ```sh
-poetry run -m python safety check
+poetry run python -m safety check
 ```
 
 # Security Policy

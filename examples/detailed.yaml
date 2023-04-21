@@ -11,6 +11,7 @@ hosts:
       - username: "libvirt"
         password: "$5$Z5a4D.T37Spa.$y.4GEqGOFFxIqd4xxGMH3zvD74DNDProWrrZeYnfhvC" # 'master'. use 'mkpasswd'.
         keys: ["$HOME/.ssh/id_rsa.pub"]
+        groups: ["sudo"]
     disk: 100 # Optional, default '30'
     memory: 8192 # Optional, default '4096'
     vcpus: 4 # Optional, default '2'

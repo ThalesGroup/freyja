@@ -20,6 +20,16 @@ out
 # Docs
 **/*.bkp
 **/*.dtmp
+docs/node_modules/
+docs/build/
+docs/.docusaurus
+docs/.cache-loader
+docs/.DS_Store
+docs/.env.local
+docs/npm-debug.log*
+docs/yarn-debug.log*
+docs/yarn-error.log*
+docs/package-lock.json
 pages/node_modules/
 pages/build/
 pages/.docusaurus
@@ -29,3 +39,4 @@ pages/.env.local
 pages/npm-debug.log*
 pages/yarn-debug.log*
 pages/yarn-error.log*
+pages/package-lock.json

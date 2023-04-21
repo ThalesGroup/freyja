@@ -7,7 +7,7 @@ hosts:
     os: "debian11"
     users:
       - keys: ["$HOME/.ssh/id_ed25519.pub"]
-        groups: ["sudo"]
     runcmd:
-      - sudo apt install linux-headers-$(uname -r)
-      - curl -fL https://get.k3s.io | sh -s - --disable traefik --write-kubeconfig-mode 644
+      - curl -fL https://get.k3s.io | sh -s
+      # kernel dev requirements if needed:
+      #- sudo apt install linux-headers-$(uname -r)

@@ -1,0 +1,26 @@
+---
+#
+#wget 'https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-generic-amd64.qcow2' -O /tmp/ubuntu-20.04-server-cloudimg-amd64.img
+version: "v0.1.0-beta"
+hosts:
+  - hostname: "k3s-master"
+    image: "/tmp/debian-11-generic-amd64.qcow2"
+    os: "debian11"
+    users:
+      - keys: ["$HOME/.ssh/id_ed25519.pub"]
+    runcmd:
+      - curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="server" K3S_TOKEN="mytoken" sh -s
+  - hostname: "k3s-worker1"
+    image: "/tmp/debian-11-generic-amd64.qcow2"
+    os: "debian11"
+    users:
+      - keys: ["$HOME/.ssh/id_ed25519.pub"]
+    runcmd:
+      - curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="agent" K3S_TOKEN="mytoken" K3S_NODE_NAME="worker1" sh -s - --server https://k3s-master:6443
+  - hostname: "k3s-worker2"
+    image: "/tmp/debian-11-generic-amd64.qcow2"
+    os: "debian11"
+    users:
+      - keys: ["$HOME/.ssh/id_ed25519.pub"]
+    runcmd:
+      - curl -sfL https://get.k3s.io | INSTALL_K3S_EXEC="agent" K3S_TOKEN="mytoken" K3S_NODE_NAME="worker2" sh -s - --server https://k3s-master:6443

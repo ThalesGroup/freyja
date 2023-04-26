@@ -20,6 +20,7 @@ out
 # Docs
 **/*.bkp
 **/*.dtmp
+docs/
 docs/node_modules/
 docs/build/
 docs/.docusaurus

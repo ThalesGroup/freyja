@@ -1,21 +1,12 @@
-name: Deploy
+name: Publish Website
 
 #permissions:
 #  content: write
-
 
 on:
   push:
     branches:
       - v0.1.0-beta
-    # Review gh actions docs if you want to further define triggers, paths, etc
-    # https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#on
-
-#defaults:
-#  run:
-#    shell: bas
-#    working-directory: ./pages
-
 
 jobs:
   deploy:
@@ -35,7 +26,7 @@ jobs:
       - name: Build website
         working-directory: ./pages
         run: npm run build
-      - name: Move docs to publish dir
+      - name: Move website to publish dir
         working-directory: ./pages
         run: mv ./build ../docs
 

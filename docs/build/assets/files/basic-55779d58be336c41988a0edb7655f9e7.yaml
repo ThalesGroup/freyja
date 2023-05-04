@@ -1,7 +1,0 @@
----
-#wget 'https://cloud-images.ubuntu.com/releases/focal/release/ubuntu-20.04-server-cloudimg-amd64.img' -O /tmp/ubuntu-20.04-server-cloudimg-amd64.img
-version: "v0.1.0-beta"
-hosts:
-  - hostname: "freyja-ubuntu"
-    image: "/tmp/ubuntu-20.04-server-cloudimg-amd64.img"
-    os: "ubuntu20.04"

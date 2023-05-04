@@ -1,6 +1,0 @@
-<network>
-  <name>ctrl-plane</name>
-  <uuid>6d37c47e-6bab-4d01-b2a0-adeb2b0de653</uuid>
-  <forward mode="bridge"/>
-  <bridge name="virbr0"/>
-</network>

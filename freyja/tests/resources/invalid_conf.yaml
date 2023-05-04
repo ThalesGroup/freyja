@@ -1,3 +1,0 @@
----
-hosts:
-  - hostname: "vm1" # MANDATORY, MUST NOT contain underscores

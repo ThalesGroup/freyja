@@ -1,9 +1,0 @@
----
-version: v0.1.0-beta
-hosts:
-  - hostname: "vm1" # MANDATORY, MUST NOT contain underscores
-    image: "/tmp/CentOS-Stream-GenericCloud-8-20210603.0.x86_64.qcow2" # MANDATORY
-    os: "centos8" # MANDATORY
-    networks: # MANDATORY, at least one
-      - name: "ctrl-plane"
-        address: "52:54:02:aa:bb:cc"

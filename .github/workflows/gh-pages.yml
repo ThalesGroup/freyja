@@ -6,7 +6,7 @@ name: Publish Website
 on:
   push:
     branches:
-      - v0.1.0-beta
+      - gh-pages
 
 jobs:
   deploy:
@@ -21,7 +21,6 @@ jobs:
 
       - name: Install dependencies
         working-directory: ./pages
-#        run: npm install --force
         run: npm install --force
       - name: Build website
         working-directory: ./pages
@@ -29,12 +28,3 @@ jobs:
       - name: Move website to publish dir
         working-directory: ./pages
         run: mv ./build ../docs
-
-      # Popular action to deploy to GitHub Pages:
-      # Docs: https://github.com/peaceiris/actions-gh-pages#%EF%B8%8F-docusaurus
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          # Build output to publish to the `gh-pages` branch:
-          publish_dir: ./docs

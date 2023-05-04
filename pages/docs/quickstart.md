@@ -1,6 +1,6 @@
 ---
 sidebar_label: 'Quick Start'
-sidebar_position: 3
+sidebar_position: 4
 ---
 
 # Quick Start
@@ -41,3 +41,9 @@ Remove the created virtual machine :
 ```sh
 freyja machine delete freyja-ubuntu
 ```
+
+## More
+
+::info Other examples
+For more usecases, check the [examples of configuration in the Github Repository](https://github.com/ThalesGroup/freyja/tree/main/examples)
+:::

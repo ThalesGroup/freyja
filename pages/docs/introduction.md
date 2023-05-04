@@ -12,7 +12,8 @@ Freyja v0.1.0-beta
 ## Overview
 
 :::info What is Freyja ?
-**Freyja** is a **rootless** virtual hosts manager that works with **Qemu/KVM** and **Libvirt**.
+**Freyja** is a **rootless** virtual hosts manager that works with **Qemu/KVM** and **Libvirt**.  
+It allows you to **provision** your virtual system **at-boot** using **Cloud-Init** or **Ignition** files.  
 :::
 
 :::info How to use Freyja ?

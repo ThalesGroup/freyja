@@ -1,19 +1,9 @@
 ---
 sidebar_label: 'Installation'
-sidebar_position: 2
+sidebar_position: 3
 ---
 
 # Installation
-
-## Requirements
-
-:::caution
-Install first :
-* Qemu-KVM & Libvirt
-* Python >= 3.9
-:::
-
-## Install
 
 Clone Freyja from the Git sources :
 
@@ -27,6 +17,6 @@ Run :
 pip install dist/freyja-0.1.0-py3-none-any.whl
 ```
 
-:::info Upgrade
+:::info Update
 In the same way, upgrade freyja with `pip install --upgrade dist/freyja-0.1.0-py3-none-any.whl`
 :::

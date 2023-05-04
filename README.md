@@ -1,26 +1,26 @@
 # FREYJA
 
-## OFFICIAL DOCUMENTATION 
+## Official Documentation
 
-Github Pages coming soon !
+[Read the official documentation here !](https://thalesgroup.github.io/freyja/)
 
-Meanwhile, read the documentation [here](./docs)
-
-## DEVELOPMENT REQUIREMENTS
+## Developer requirements
 
 * Python (version >= 3.9)
-* Poetry (version >= 1.3.2)
+* [Poetry (version >= 1.3.2)](https://python-poetry.org/docs/#installation)
 
-## BUILD
+## Build
+
+Build a development version :
 
 ```sh
 ./build.sh
 ```
 
-## CORE TEAM
+## Dev installation
 
-* Project Management Committee:
-    * **louis.cailliot@thalesgroup.com**
-* Committers:
-    * **louis.cailliot@thalesgroup.com**
-    * **nicolas.peiffer@thalesgroup.com**
+Install locally the development version :
+
+```sh
+./install.sh
+```

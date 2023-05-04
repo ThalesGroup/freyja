@@ -1,4 +1,4 @@
-name: Publish Website
+name: Build Website
 
 #permissions:
 #  content: write
@@ -25,6 +25,8 @@ jobs:
       - name: Build website
         working-directory: ./pages
         run: npm run build
+      - name: Delete old version
+        run: rm -rf ./docs
       - name: Move website to publish dir
         working-directory: ./pages
         run: mv ./build ../docs

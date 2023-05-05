@@ -24,7 +24,7 @@ sudo apt install python3.9
 Install Poetry :
 
 ```sh
-curl -sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py | python3.9 -
-source $HOME/.poetry/env
-poetry --version
+# poetry is installed in $HOME/.local/bin
+curl -sSL https://install.python-poetry.org | python3 -
+export PATH="$HOME/.local/bin:$PATH"
 ```

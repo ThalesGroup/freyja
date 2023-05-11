@@ -73,17 +73,17 @@ freyja machine info | grep mac
 
 Create a snapshot of a machine :
 ```sh
-freyja snapshot vm1 snaphost_name
+freyja machine snapshot vm1 snaphost_name
 ```
 
 Restore a snapshot of a machine :
 ```sh
-freyja restore vm1 snaphost_name
+freyja machine restore vm1 snaphost_name
 ```
 
 List the snapshots of a machine :
 ```sh
-freyja list-snapshots vm1
+freyja machine list-snapshots vm1
 ```
 
 List networks:

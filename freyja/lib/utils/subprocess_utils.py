@@ -51,3 +51,9 @@ def yes_no_question(question: str, default: bool):
             return valid[choice]
         else:
             pass
+
+def execute_interactive(command: List[str]):
+    try:
+        subprocess.check_call(command)
+    except subprocess.CalledProcessError as e:
+        raise ChildProcessError(str(e))

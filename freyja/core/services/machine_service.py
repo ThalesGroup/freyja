@@ -10,7 +10,7 @@ from freyja.environment import FreyjaEnvironment
 from freyja.lib.exceptions.machine_exceptions import MachineAlreadyExists
 from freyja.lib.utils.bytes_utils import convert_size
 from freyja.lib.utils.error_utils import check_message
-from freyja.lib.utils.subprocess_utils import execute
+from freyja.lib.utils.subprocess_utils import execute, execute_interactive
 from freyja.lib.utils.virsh_utils import parse_info, parse_list, parse_stats
 from freyja.logger import FreyjaLogger
 from freyja.models import machine_info
@@ -342,3 +342,38 @@ def usage_machine(names: List[str], watch: bool = False):
         curses.nocbreak()
         curses.echo()
         curses.endwin()
+
+def open_console_machine(domain: str):
+    """
+    Opens a console for the provided machine
+    :param name: name of the machine in which the console will be opened
+    """
+    try:
+        execute_interactive(["virsh", "console", domain])
+    except ChildProcessError as e:
+        logger.warning(f"Skip {domain}: Machine not found")
+       
+        
+def create_snapshot(domain: str, name:str):
+    try:
+        execute(["virsh", "snapshot-create-as", domain, "--name", name])
+    except ChildProcessError as e:
+        logger.warning(f"Skip {domain}: Machine not found")
+
+
+def restore_snapshot(domain: str, name:str):
+    try:
+        execute(["virsh", "snapshot-revert", domain, "--snapshotname", name])
+    except ChildProcessError as e:
+        if check_message(e, "snapshot"):
+            logger.warning(f"Skip {domain}: snapshot {name} not found")
+        else:
+            logger.warning(f"Skip {domain}: Machine not found")
+            
+
+def list_snapshot(domain:str):
+    try:
+        execute(["virsh", "snapshot-list", domain], stream_stdout=True)
+        
+    except ChildProcessError as e:
+        logger.warning(f"Skip {domain}: Machine not found")

@@ -8,7 +8,7 @@ import yaml
 from freyja.core.services.machine_service import create_machines, delete_machines, info_machines, \
     list_machines, \
     restart_machines, start_machines, \
-    stop_machines, usage_machine
+    stop_machines, usage_machine, open_console_machine
 from freyja.lib.exceptions.configuration_exceptions import ConfigurationContentError, \
     ConfigurationFileNotFoundException, \
     ConfigurationFormatError
@@ -126,3 +126,40 @@ def usage(names: Optional[List[str]] = typer.Argument(None, help="VM names list 
     Display the virtual machines cpu and memory usage.
     """
     usage_machine(names, watch)
+
+@app.command()
+def console(name: str = typer.Argument(..., help="VM name in which a console should be opened")):
+    """
+    Opens a console in the specified machine
+    """
+    open_console_machine(name)
+    
+    
+@app.command()
+def restore(name: str = typer.Argument(..., help="VM name to restore"), snapshot: str = typer.Argument(..., help="Name of the snapshot")):
+    """
+    Restore a VM from a snapshot
+    """
+    restore_snapshot(name, snapshot)
+    logger.warning(f"The machine {name} will be restore to snapshot {snapshot}")
+    if yes_no_question("Are you sure ? (Y/n)[default: n]", False):
+        restore_snapshot(name, snapshot)
+        logger.info("OK")
+    else:
+        logger.info("Aborted")
+    
+    
+@app.command()
+def snapshot(name: str = typer.Argument(..., help="VM name to snapshot"), snapshot: str = typer.Argument(..., help="Name of the snapshot")):
+    """
+    Create a snapshot of a VM
+    """
+    create_snapshot(name, snapshot)
+    
+
+@app.command()
+def list_snapshots(name: str = typer.Argument(..., help="VM name to list snapshots")):
+    """
+    List snapshots of a VM
+    """
+    list_snapshot(name)

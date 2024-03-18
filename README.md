@@ -1,26 +1,19 @@
 # FREYJA
 
-## OFFICIAL DOCUMENTATION 
+Beta in progress !
 
-Github Pages coming soon !
+Simple concept :
 
-Meanwhile, read the documentation [here](./docs)
+![architecture.drawio.png](pages/static/img/architecture.drawio.png)
 
-## DEVELOPMENT REQUIREMENTS
+Simple usage :
 
-* Python (version >= 3.9)
-* Poetry (version >= 1.3.2)
+![shell.png](pages/static/img/shell.png)
 
-## BUILD
+## Documentation
 
-```sh
-./build.sh
-```
+Visit [https://theresis.pages.thalesdigital.io/freyja](https://theresis.pages.thalesdigital.io/freyja)
 
-## CORE TEAM
+## Developers
 
-* Project Management Committee:
-    * **louis.cailliot@thalesgroup.com**
-* Committers:
-    * **louis.cailliot@thalesgroup.com**
-    * **nicolas.peiffer@thalesgroup.com**
+Read our guide : [CONTRIBUTING.md](CONTRIBUTING.md)

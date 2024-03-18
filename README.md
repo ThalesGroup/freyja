@@ -4,16 +4,20 @@ Beta in progress !
 
 Simple concept :
 
-![architecture.drawio.png](pages/static/img/architecture.drawio.png)
+![architecture.drawio.png](static/architecture.drawio.png)
 
 Simple usage :
 
-![shell.png](pages/static/img/shell.png)
+![shell.png](static/shell.png)
 
 ## Documentation
 
-Visit [https://theresis.pages.thalesdigital.io/freyja](https://theresis.pages.thalesdigital.io/freyja)
+🚀 Visit [https://thalesgroup.github.io/freyja/](https://thalesgroup.github.io/freyja/) 🚀
 
 ## Developers
 
 Read our guide : [CONTRIBUTING.md](CONTRIBUTING.md)
+
+### Security
+
+Please respect our security guidelines in our guide : [SECURITY.md](SECURITY.md)

@@ -52,6 +52,7 @@ def yes_no_question(question: str, default: bool):
         else:
             pass
 
+
 def execute_interactive(command: List[str]):
     try:
         subprocess.check_call(command)

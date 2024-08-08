@@ -2,7 +2,7 @@
   <configuration default="false" name="freyja" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="freyja" />
     <working_directory value="$PROJECT_DIR$" />
-    <parameters value="--help" />
+    <parameters value="machine start " />
     <kind value="PACKAGE" />
     <package value="freyja/cmd/freyja" />
     <directory value="$PROJECT_DIR$" />

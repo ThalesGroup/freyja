@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="freyja" type="GoApplicationRunConfiguration" factoryName="Go Application">
+    <module name="freyja" />
+    <working_directory value="$PROJECT_DIR$" />
+    <parameters value="--help" />
+    <kind value="PACKAGE" />
+    <package value="freyja/cmd/freyja" />
+    <directory value="$PROJECT_DIR$" />
+    <filePath value="$PROJECT_DIR$/cmd/freyja/main.go" />
+    <method v="2" />
+  </configuration>
+</component>

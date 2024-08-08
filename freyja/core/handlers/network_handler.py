@@ -32,14 +32,14 @@ class NetworkHandler:
     def _enrich(self):
         """
         Get the user's networks configurations and for each one of them, add needed information
-        to create them in libvirt
+        to create them in handler
         :return: the enriched networks configuration
         """
         self.configuration['uuid'] = uuid.uuid4()
 
     def _render(self):
         """
-        For each network configuration, render the templates needed to create the network in libvirt
+        For each network configuration, render the templates needed to create the network in handler
         """
         jinja_env = Environment(loader=FileSystemLoader(FreyjaEnvironment.TEMPLATES_DIR), trim_blocks=True,
                                 lstrip_blocks=True)

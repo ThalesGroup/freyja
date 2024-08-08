@@ -23,7 +23,7 @@ def log_debug(verbose: bool):
 @app.command(name="list")
 def list_():
     """
-    List the created networks in libvirt
+    List the created networks in handler
     """
     list_networks()
 

@@ -11,7 +11,7 @@ def main():
     FreyjaLogger()
     # env
     FreyjaEnvironment.init()
-    # init cli
+    # init shellcli
     cli()
 
 

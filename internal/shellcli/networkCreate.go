@@ -9,7 +9,7 @@ import (
 var networkCreateCmd = &cobra.Command{
 	Use:              "create",
 	Short:            "Virtual network creation",
-	Long:             "Virtual network creation using libvirt",
+	Long:             "Virtual network creation using handler",
 	TraverseChildren: true, // ensure local flags do not spread to sub commands
 
 	Run: func(cmd *cobra.Command, args []string) {

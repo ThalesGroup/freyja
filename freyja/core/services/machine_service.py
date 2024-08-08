@@ -120,7 +120,7 @@ def delete_machines(names: List[str]):
 
 def list_machines(names: bool = False, stdout: bool = True) -> "List[str]":
     """
-    List the machines in libvirt
+    List the machines in handler
     :param names: If true, only print the vm names
     :param stdout: If True, stream the subprocess stdout to this app stdout
     :return: The subprocess stdout lines
@@ -137,7 +137,7 @@ def parse_machines_network_info(domain: str, domiflist: List[Dict[str, str]]) \
     Parse domain's domiflist and domifaddr and network information into a list of Networks info
     models
     :param domain: domain name
-    :param domiflist: raw domiflist dictionary output from libvirt
+    :param domiflist: raw domiflist dictionary output from handler
     :return: the resulting Info model
     """
     result = []
@@ -172,8 +172,8 @@ def parse_machines_info(domain: str, dominfo: Dict[str, str], domiflist: List[Di
     """
     Parse domain's dominfo and network information to the Info model
     :param domain: domain name
-    :param dominfo: raw dominfo dictionary output from libvirt
-    :param domiflist: raw domiflist dictionary output from libvirt
+    :param dominfo: raw dominfo dictionary output from handler
+    :param domiflist: raw domiflist dictionary output from handler
     :return: the resulting Info model
     """
     # parse networks information domiflist and domifaddr for this domain
@@ -191,7 +191,7 @@ def parse_machines_info(domain: str, dominfo: Dict[str, str], domiflist: List[Di
 
 def get_domain_info(domain: str) -> "Info":
     """
-    Collect various information about a libvirt domain and parse it into a model
+    Collect various information about a handler domain and parse it into a model
     :param domain: the domain concerned by the information query
     :return: the information model
     """
@@ -208,7 +208,7 @@ def get_domain_info(domain: str) -> "Info":
 
 def info_machines(names: List[str]) -> "Dict":
     """
-    List the machines in libvirt and query all the needed information for each machine
+    List the machines in handler and query all the needed information for each machine
     :param names: If true, only print the vm names
     :return: The subprocess stdout lines
     """

@@ -11,7 +11,7 @@ Creating a VM, you encounter the following error :
 
 ```sh
 WARNING  /home/user/freyja-workspace/build/almalinux/almalinux_cloud_init.iso may not be accessible by th
-e hypervisor. You will need to grant the 'libvirt-qemu' user search permissions for the following directo
+e hypervisor. You will need to grant the 'handler-qemu' user search permissions for the following directo
 ries: ['/home/user']                                
 ERROR    Cannot access storage file '/home/user/freyja-workspace/build/image/image_snapshot' (as 
 uid:64055, gid:109): Permission denied                                                                   
@@ -21,14 +21,14 @@ Domain installation does not appear to have been successful.
 To solve this issue, set ACL of your host :
 
 ```sh
-setacl u:libvirt-qemu:r $HOME
+setacl u:handler-qemu:r $HOME
 getacl -e $HOME
 
 # file: home/user
 # owner: user
 # group: user
 user::rwx
-user:libvirt-qemu:r             #effective:r
+user:handler-qemu:r             #effective:r
 group::r-x                      #effective:r-x
 mask::r-x
 other::---
@@ -60,7 +60,7 @@ To solve this, you should grant `mmap` permission to `virt-aa-helper` for `libcr
 Update `/etc/apparmor.d/usr.lib.libvirt.virt-aa-helper` with `mmap` permission for `libcrypto` :
 
 ```sh
-echo "  /opt/openssl/lib/libcrypto.so.1.1 m," >> /etc/apparmor.d/usr.lib.libvirt.virt-aa-helper
+echo "  /opt/openssl/lib/libcrypto.so.1.1 m," >> /etc/apparmor.d/usr.lib.handler.virt-aa-helper
 sudo systemctl restart apparmor
 ```
 
@@ -76,7 +76,7 @@ To solve this, you should grant `read` permission for `libvirt` for ignition fil
 Update `/etc/apparmor.d/abstractions/libvirt-qemu` with `read` permission for the Freyja workspace :
 
 ```sh
-echo "  /home/<user>/freyja-workspace/** r," >> /etc/apparmor.d/abstractions/libvirt-qemu
+echo "  /home/<user>/freyja-workspace/** r," >> /etc/apparmor.d/abstractions/handler-qemu
 sudo systemctl restart apparmor
 ```
 

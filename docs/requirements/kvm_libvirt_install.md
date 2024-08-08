@@ -16,7 +16,7 @@ sudo apt install cpu-checker -y && kvm-ok
 Install qemu-kvm and libvirt :
 
 ```sh
-sudo apt install qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils virtinst cloud-utils
+sudo apt install qemu-kvm handler-daemon-system handler-clients bridge-utils virtinst cloud-utils
 # check installation
 sudo systemctl is-active libvirtd
 ```
@@ -24,7 +24,7 @@ sudo systemctl is-active libvirtd
 Allow your user to use libvirt and kvm:
 
 ```sh
-sudo usermod -aG libvirt,kvm $USER
+sudo usermod -aG handler,kvm $USER
 ```
 
 **Logout and login again !**
@@ -32,7 +32,7 @@ sudo usermod -aG libvirt,kvm $USER
 Check your groups permissions :
 
 ```sh
-# libvirt & kvm MUST appear in your user's groups
+# handler & kvm MUST appear in your user's groups
 groups
 ```
 

@@ -107,7 +107,7 @@ class MachineHandler:
         jinja_env = Environment(loader=FileSystemLoader(FreyjaEnvironment.TEMPLATES_DIR), trim_blocks=True,
                                 lstrip_blocks=True)
 
-        # render installation script for libvirt
+        # render installation script for handler
         install_script: str = jinja_env \
             .get_template(FreyjaEnvironment.CREATE_VM_TEMPLATE_NAME) \
             .render(enriched_configuration)

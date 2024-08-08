@@ -58,7 +58,7 @@ version: "v0.1.0-beta"
 
 hosts:
   # Mandatory hostname that must be unique
-  # It defines the domain name of the machine in libvirt
+  # It defines the domain name of the machine in handler
   - hostname: "debian11"
 
     # Mandatory path to the image to start the virtual machine
@@ -96,15 +96,15 @@ hosts:
         # Optional additional groups for the current unix account
         groups: [ "sudo" ]
 
-    # Optional list of subnetworks to create alongside the virtual machine in libvirt
-    # Default network is 'default' and a dynamic MAC address will be provided by libvirt
-    # By default, the defined networks will be attached to the libvirt bridge 'virbr0'
+    # Optional list of subnetworks to create alongside the virtual machine in handler
+    # Default network is 'default' and a dynamic MAC address will be provided by handler
+    # By default, the defined networks will be attached to the handler bridge 'virbr0'
     networks:
-        # Mandatory name of the network domain to create in libvirt
+        # Mandatory name of the network domain to create in handler
         # If this network does not exist yet, it will be created
         # If this network already exists, it will be attached to the current virtual machine 
       - name: "default"
-        # Mandatory MAC address of the virtual machine inside the current subnetwork domain of libvirt
+        # Mandatory MAC address of the virtual machine inside the current subnetwork domain of handler
         # The address must be unique in this network
         address: "52:54:02:aa:aa:aa"
         

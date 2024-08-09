@@ -4,7 +4,7 @@ import (
 	"github.com/aquasecurity/table"
 	"github.com/digitalocean/go-libvirt"
 	"github.com/spf13/cobra"
-	"go.uber.org/zap"
+	"log"
 	"os"
 )
 
@@ -22,8 +22,7 @@ var machineListCmd = &cobra.Command{
 		// domains list
 		domains, err := getDomainsList()
 		if err != nil {
-			Logger.Panic("Could not list the machines",
-				zap.Error(err))
+			log.Panic("Could not list the machines", "error", err)
 		}
 
 		// print list in stdout

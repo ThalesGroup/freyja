@@ -6,6 +6,8 @@ import (
 	"github.com/digitalocean/go-libvirt"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+	"log"
+	"log/slog"
 	"net/url"
 	"os"
 )
@@ -14,7 +16,7 @@ import (
 var verbose bool
 
 // Logger Freyja logger
-var Logger *zap.Logger
+var Logger *slog.Logger
 
 // LibvirtConnexion qemu connexion
 var LibvirtConnexion *libvirt.Libvirt
@@ -47,37 +49,25 @@ var rootCmd = &cobra.Command{
 }
 
 func setLogger() {
-	level := zap.InfoLevel
-	if verbose {
-		level = zap.DebugLevel
+	prettyOpts := PrettyHandlerOptions{
+		SlogOpts: slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		},
 	}
-	config := zap.Config{
-		Level:             zap.NewAtomicLevelAt(level),
-		Development:       false,
-		DisableCaller:     true,
-		DisableStacktrace: true,
-		Sampling:          nil,
-		Encoding:          "console",
-		EncoderConfig:     zap.NewDevelopmentEncoderConfig(),
-		OutputPaths:       []string{"stdout", "/tmp/golang_starter-tutorial-logger-zap.log"},
-		ErrorOutputPaths:  []string{"stderr", "/tmp/golang_starter-tutorial-logger-zap-error.log"},
-		InitialFields:     nil,
-	}
-	// build the new custom logger
-	Logger = zap.Must(config.Build())
-
+	prettyHandler := NewPrettyHandler(os.Stdout, prettyOpts)
+	Logger = slog.New(prettyHandler)
 }
 
 func initLibvirtConnexion() *libvirt.Libvirt {
 	// qemu connexion initialization
 	uri, err := url.Parse(string(libvirt.QEMUSystem))
 	if err != nil {
-		Logger.Panic("Cannot parse Qemu system URI",
+		log.Panic("Cannot parse Qemu system URI",
 			zap.Error(err))
 	}
 	connexion, err := libvirt.ConnectToURI(uri)
 	if err != nil {
-		Logger.Panic("Could not open Qemu connexion",
+		log.Panic("Could not open Qemu connexion",
 			zap.Error(err))
 	}
 	return connexion
@@ -104,11 +94,6 @@ func finalize() {
 	if err := LibvirtConnexion.Disconnect(); err != nil {
 		Logger.Error("Could not close Qemu connexion",
 			zap.Error(err))
-	}
-
-	// Finalize logger
-	if Logger != nil {
-		Logger.Sync()
 	}
 }
 

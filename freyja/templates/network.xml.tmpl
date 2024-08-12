@@ -1,6 +1,0 @@
-<network>
-  <name>{{ .Name }}</name>
-  <uuid>{{ .Uuid }}</uuid>
-  <forward mode="bridge"/>
-  <bridge name=({{ if .Interface }}"{{ .Interface }}"{{ else }}"virbr0"{{end}})/>
-</network>

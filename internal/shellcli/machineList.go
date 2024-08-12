@@ -1,6 +1,7 @@
 package shellcli
 
 import (
+	"freyja/internal"
 	"github.com/aquasecurity/table"
 	"github.com/digitalocean/go-libvirt"
 	"github.com/spf13/cobra"
@@ -17,7 +18,7 @@ var machineListCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		// logger
-		setLogger()
+		Logger = internal.InitLogger()
 
 		// domains list
 		domains, err := getDomainsList()
@@ -26,7 +27,7 @@ var machineListCmd = &cobra.Command{
 		}
 
 		// print list in stdout
-		printList(domains)
+		printMachinesList(domains)
 	},
 }
 
@@ -36,7 +37,7 @@ func getDomainsList() ([]libvirt.Domain, error) {
 	return domains, err
 }
 
-func printList(domains []libvirt.Domain) {
+func printMachinesList(domains []libvirt.Domain) {
 	// init table
 	t := table.New(os.Stdout)
 	t.SetRowLines(false)
@@ -45,7 +46,7 @@ func printList(domains []libvirt.Domain) {
 	// for each domain
 	for _, d := range domains {
 		state, _, _ := LibvirtConnexion.DomainGetState(d, 0)
-		t.AddRow(d.Name, getState(state))
+		t.AddRow(d.Name, getMachineState(state))
 	}
 	t.Render()
 }
@@ -58,7 +59,7 @@ func printList(domains []libvirt.Domain) {
 // DomainShutoff     DomainState = 5
 // DomainCrashed     DomainState = 6
 // DomainPmsuspended DomainState = 7
-func getState(state int32) string {
+func getMachineState(state int32) string {
 	switch state {
 	case int32(libvirt.DomainRunning):
 		return "running"

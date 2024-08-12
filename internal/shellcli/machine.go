@@ -4,8 +4,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// MachineCmd
 // commands definitions
-var machineCmd = &cobra.Command{
+var MachineCmd = &cobra.Command{
 	Use:              "machine",
 	Short:            "Virtual machine management",
 	Long:             "Virtual machine management to create, start, stop or delete machines.",
@@ -15,10 +16,10 @@ var machineCmd = &cobra.Command{
 }
 
 func init() {
-	machineCmd.AddCommand(machineCreateCmd)
-	machineCmd.AddCommand(machineStartCmd)
-	machineCmd.AddCommand(machineStopCmd)
-	machineCmd.AddCommand(machineRestartCmd)
-	machineCmd.AddCommand(machineDeleteCmd)
-	machineCmd.AddCommand(machineListCmd)
+	MachineCmd.AddCommand(machineCreateCmd)
+	MachineCmd.AddCommand(machineStartCmd)
+	MachineCmd.AddCommand(machineStopCmd)
+	MachineCmd.AddCommand(machineRestartCmd)
+	MachineCmd.AddCommand(machineDeleteCmd)
+	MachineCmd.AddCommand(machineListCmd)
 }

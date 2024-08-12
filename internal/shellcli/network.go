@@ -4,8 +4,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// NetworkCmd
 // commands definitions
-var networkCmd = &cobra.Command{
+var NetworkCmd = &cobra.Command{
 	Use:              "network",
 	Short:            "Virtual network management",
 	Long:             "Virtual network management to create, start, stop or delete networks.",
@@ -15,6 +16,7 @@ var networkCmd = &cobra.Command{
 }
 
 func init() {
-	networkCmd.AddCommand(networkCreateCmd)
-	networkCmd.AddCommand(networkDeleteCmd)
+	NetworkCmd.AddCommand(networkCreateCmd)
+	NetworkCmd.AddCommand(networkListCmd)
+	NetworkCmd.AddCommand(networkDeleteCmd)
 }

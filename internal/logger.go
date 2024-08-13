@@ -72,7 +72,7 @@ func NewPrettyHandler(out io.Writer, opts PrettyHandlerOptions) *PrettyHandler {
 	}
 }
 
-func InitLogger() *slog.Logger {
+func InitPrettyLogger() *slog.Logger {
 	prettyOpts := PrettyHandlerOptions{
 		SlogOpts: slog.HandlerOptions{
 			Level: slog.LevelDebug,

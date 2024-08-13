@@ -31,7 +31,7 @@ var networkCreateCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		// logger
-		internal.InitLogger()
+		internal.InitPrettyLogger()
 
 		// init the network workspace directory in home user
 		initNetworksWorkspace()

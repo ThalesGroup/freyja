@@ -18,7 +18,7 @@ var machineListCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		// logger
-		Logger = internal.InitLogger()
+		Logger = internal.InitPrettyLogger()
 
 		// domains list
 		domains, err := getDomainsList()

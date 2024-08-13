@@ -19,7 +19,7 @@ var machineStartCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		// logger
-		Logger = internal.InitLogger()
+		Logger = internal.InitPrettyLogger()
 		// execute
 		machineStart(startDomainName)
 	},

@@ -18,7 +18,7 @@ var networkListCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		// logger
-		Logger = internal.InitLogger()
+		Logger = internal.InitPrettyLogger()
 
 		// networks list
 		networks, err := getNetworksList()

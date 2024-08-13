@@ -19,7 +19,7 @@ var machineStopCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		// logger
-		internal.InitLogger()
+		internal.InitPrettyLogger()
 		// execute
 		machineStop(stopDomainName)
 	},

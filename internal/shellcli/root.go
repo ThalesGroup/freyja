@@ -41,7 +41,7 @@ var rootCmd = &cobra.Command{
 		// Is overridden by 'Run' function of subcommands calls.
 		// Do you processing here
 		// Like command annotations
-		Logger = internal.InitLogger()
+		Logger = internal.InitPrettyLogger()
 	},
 	PostRun: func(cmd *cobra.Command, args []string) {
 		// Will be call at the end of any subcommand

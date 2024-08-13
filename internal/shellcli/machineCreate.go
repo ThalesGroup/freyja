@@ -25,5 +25,5 @@ func init() {
 }
 
 func machineCreate(configuration string) {
-
+	// TODO create a metadata to know which domain uses what network
 }

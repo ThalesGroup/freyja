@@ -1,0 +1,4 @@
+ Interface   Type     Source       Model    MAC
+---------------------------------------------------------------
+ vnet0       bridge   ctrl-plane   virtio   52:54:02:aa:bb:dd
+ vnet0       bridge   data-plane   virtio   52:54:02:aa:bb:cc

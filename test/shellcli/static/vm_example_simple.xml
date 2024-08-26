@@ -1,0 +1,34 @@
+<domain type='kvm'>
+  <name>test1</name>
+  <uuid>4dea24b3-1d52-d8f3-2516-782e98a23fa0</uuid>
+  <memory unit="KiB">131072</memory>
+  <vcpu>1</vcpu>
+  <os>
+    <type arch="x86_64">hvm</type>
+  </os>
+  <clock sync="localtime"/>
+  <devices>
+    <emulator>/usr/bin/qemu-kvm</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='/home/kaio/freyja-workspace/build/debian12/debian12_vdisk.debian12' index='2'/>
+      <backingStore type='file' index='3'>
+        <format type='qcow2'/>
+        <source file='/home/kaio/Images/debian12'/>
+      </backingStore>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+    <disk type='file' device='cdrom'>
+      <driver name='qemu' type='raw'/>
+      <source file='/home/kaio/freyja-workspace/build/debian12/debian12_cloud_init.iso' index='1'/>
+      <target dev='sda' bus='sata'/>
+    </disk>
+    <interface type='network'>
+      <source network='default' bridge='virbr0'/>
+      <mac address='24:42:53:21:52:45'/>
+      <target dev='vnet0'/>
+      <model type='virtio'/>
+    </interface>
+    <graphics type='vnc' port='-1' keymap='de'/>
+  </devices>
+</domain>

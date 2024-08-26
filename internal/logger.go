@@ -10,6 +10,8 @@ import (
 	"os"
 )
 
+var Logger = InitPrettyLogger()
+
 type PrettyHandlerOptions struct {
 	// wrap slog handler options
 	SlogOpts slog.HandlerOptions

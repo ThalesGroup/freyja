@@ -6,7 +6,7 @@ import (
 
 // NetworkCmd
 // commands definitions
-var NetworkCmd = &cobra.Command{
+var networkCmd = &cobra.Command{
 	Use:              "network",
 	Short:            "Virtual network management",
 	Long:             "Virtual network management to create, start, stop or delete networks.",
@@ -16,7 +16,8 @@ var NetworkCmd = &cobra.Command{
 }
 
 func init() {
-	NetworkCmd.AddCommand(networkCreateCmd)
-	NetworkCmd.AddCommand(networkListCmd)
-	NetworkCmd.AddCommand(networkDeleteCmd)
+	networkCmd.AddCommand(networkCreateCmd)
+	networkCmd.AddCommand(networkListCmd)
+	networkCmd.AddCommand(networkDeleteCmd)
+	networkCmd.AddCommand(networkInfoCmd)
 }

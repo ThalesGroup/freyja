@@ -1,7 +1,6 @@
 package shellcli
 
 import (
-	"freyja/internal"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
@@ -18,10 +17,20 @@ var machineStartCmd = &cobra.Command{
 	TraverseChildren: true, // ensure local flags do not spread to sub commands
 
 	Run: func(cmd *cobra.Command, args []string) {
-		// logger
-		Logger = internal.InitPrettyLogger()
-		// execute
-		machineStart(startDomainName)
+		domain, _ := LibvirtConnexion.DomainLookupByName(startDomainName)
+		if err := LibvirtConnexion.DomainCreate(domain); err != nil {
+			if strings.Contains(err.Error(), "already running") {
+				Logger.Warn("Machine is already running", "name", startDomainName)
+				os.Exit(0)
+			} else if strings.Contains(err.Error(), "not found") {
+				Logger.Error("Machine not found", "name", startDomainName)
+				os.Exit(1)
+			} else {
+				log.Panicf("Could not start the machine: %s. Reason: %v", startDomainName, err)
+			}
+		}
+		Logger.Info("Start machine", "name", startDomainName)
+
 	},
 }
 
@@ -30,20 +39,4 @@ func init() {
 	if err := machineStartCmd.MarkFlagRequired("name"); err != nil {
 		log.Panic(err.Error())
 	}
-}
-
-func machineStart(domainName string) {
-	domain, _ := LibvirtConnexion.DomainLookupByName(domainName)
-	if err := LibvirtConnexion.DomainCreate(domain); err != nil {
-		if strings.Contains(err.Error(), "already running") {
-			Logger.Warn("Machine is already running", "name", domainName)
-			os.Exit(0)
-		} else if strings.Contains(err.Error(), "not found") {
-			Logger.Error("Machine not found", "name", domainName)
-			os.Exit(1)
-		} else {
-			log.Panicf("Could not start the machine: %s. Reason: %v", domainName, err)
-		}
-	}
-	Logger.Info("Start machine", "name", domainName)
 }

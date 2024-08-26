@@ -1,7 +1,6 @@
 package shellcli
 
 import (
-	"freyja/internal"
 	"github.com/aquasecurity/table"
 	"github.com/digitalocean/go-libvirt"
 	"github.com/spf13/cobra"
@@ -17,9 +16,6 @@ var machineListCmd = &cobra.Command{
 	TraverseChildren: true, // ensure local flags do not spread to sub commands
 
 	Run: func(cmd *cobra.Command, args []string) {
-		// logger
-		Logger = internal.InitPrettyLogger()
-
 		// domains list
 		domains, err := getDomainsList()
 		if err != nil {

@@ -1,0 +1,9 @@
+---
+version: v0.1.0-beta
+machines:
+  - hostname: "vm1" # MANDATORY, MUST NOT contain underscores
+    image: "/tmp/CentOS-Stream-GenericCloud-8-20210603.0.x86_64.qcow2" # MANDATORY
+    os: "centos8" # MANDATORY
+    files:
+      - source: "/tmp/hello.txt"
+        destination: "/root/hello.txt"

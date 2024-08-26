@@ -1,16 +1,13 @@
 package shellcli
 
 import (
-	"bufio"
+	"encoding/xml"
 	"freyja/internal"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
-	"path/filepath"
-	"text/template"
+	"strings"
 )
-
-var configurationPath string
 
 const networkTemplatePath string = "templates/network.xml.tmpl"
 
@@ -20,7 +17,7 @@ type NetworkData struct {
 	Interface string
 }
 
-var networksDir string
+var networkName string
 
 // commands definitions
 var networkCreateCmd = &cobra.Command{
@@ -30,69 +27,62 @@ var networkCreateCmd = &cobra.Command{
 	TraverseChildren: true, // ensure local flags do not spread to sub commands
 
 	Run: func(cmd *cobra.Command, args []string) {
-		// logger
-		internal.InitPrettyLogger()
+		// TODO :
+		//  to create a network with existing routed interfaces on host :
+		//  https://libvirt.org/formatnetwork.html#routed-network-config
 
-		// init the network workspace directory in home user
-		initNetworksWorkspace()
-
-		// execute
-		if err := networkCreate("test-dev"); err != nil {
-			log.Panic("Cannot create network: ", err)
+		config := NetworkCreateConfig(networkName)
+		configXMLBytes, err := xml.Marshal(config)
+		if err != nil {
+			Logger.Error("cannot parse network config", "network", networkName, "config", config, "reason", err)
+			os.Exit(1)
 		}
+		configStr := string(configXMLBytes)
+
+		// create the network in libvirt
+		_, err = LibvirtConnexion.NetworkCreateXML(configStr)
+		if err != nil {
+			if strings.Contains(err.Error(), "already exists") {
+				Logger.Warn("Network already exists", "network", networkName)
+				os.Exit(0)
+			}
+			Logger.Error("Cannot create the network using libvirt", "config", configStr, "reason", err)
+			os.Exit(1)
+		}
+
+		// define the network in libvirt
+		net, err := LibvirtConnexion.NetworkDefineXML(configStr)
+		if err != nil {
+			Logger.Warn("Network created but could not define it in libvirt", "network", networkName, "reason", err)
+		}
+
+		// set autostart
+		if err := LibvirtConnexion.NetworkSetAutostart(net, 0); err != nil {
+			Logger.Warn("Network created and defined but could not set autostart in libvirt", "network", networkName, "reason", err)
+		}
+		Logger.Info("Network created", "name", networkName)
+
 	},
 }
 
-// initNetworksWorkspace creates the networks dir
-func initNetworksWorkspace() {
-	networksDir = filepath.Join(FreyjaWorkspaceDir, "networks")
-	if err := os.MkdirAll(networksDir, os.ModePerm); err != nil {
-		log.Panic("Could not create networks directory: ", err)
-	}
-}
-
 func init() {
-	networkCreateCmd.Flags().StringVarP(&configurationPath, "config", "c", "", "Path to the configuration file to create the machines and the networks.")
-	if err := networkCreateCmd.MarkFlagRequired("config"); err != nil {
+	networkCreateCmd.Flags().StringVarP(&networkName, "name", "n", "", "Name of the network to create")
+	if err := networkCreateCmd.MarkFlagRequired("name"); err != nil {
 		log.Panic(err.Error())
 	}
-
 }
 
-// networkCreate
-// we choose to implement network creation for machine creation only
-func networkCreate(networkName string) error {
-	// TODO Check if the uuid does not already used by an existing network
-	uuid := internal.GenerateUUID()
-	// template input data
-	data := &NetworkData{
-		Name: networkName,
-		UUID: uuid,
+func NetworkCreateConfig(networkName string) internal.XMLNetworkDescription {
+	configForward := internal.XMLNetworkDescriptionForward{
+		Mode: "bridge",
 	}
-
-	// template file loading
-	networkTemplateContent, err := Templates.ReadFile(networkTemplatePath)
-	if err != nil {
-		log.Panic("Impossible to load internal network template file: ", err)
+	configBridge := internal.XMLNetworkDescriptionBridge{
+		Name: "virbr0",
 	}
-
-	// template rendering in output file
-	outputPath := filepath.Join(networksDir, networkName+".xml")
-	outputIoFile, err := os.Create(outputPath)
-	if err != nil {
-		Logger.Error("Cannot open path to generate network config file", "path", outputPath)
-		return err
+	return internal.XMLNetworkDescription{
+		Name:    networkName,
+		UUID:    internal.GenerateUUID(),
+		Forward: configForward,
+		Bridge:  configBridge,
 	}
-	defer outputIoFile.Close()
-	outputWriter := bufio.NewWriter(outputIoFile)
-
-	t := template.Must(template.New("networkTemplate").Parse(string(networkTemplateContent)))
-	if err = t.Execute(outputWriter, data); err != nil {
-		Logger.Error("Cannot generate the network output config", "output", outputPath, "input", data)
-		return err
-	}
-	if err = outputWriter.Flush(); err != nil {
-		log.Panic("Cannot flush buffer writer to the generated network config file: ", err)
-	}
-	return nil
 }

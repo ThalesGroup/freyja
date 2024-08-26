@@ -1,0 +1,39 @@
+---
+version: v0.1.0-beta
+machines:
+  - image: "/tmp/CentOS-Stream-GenericCloud-8-20210603.0.x86_64.qcow2" # MANDATORY
+    os: "centos8" # MANDATORY
+    hostname: "vm1" # MANDATORY, MUST NOT contain underscores
+    networks: # MANDATORY, at least one
+      - name: "ctrl-plane"
+        mac: "52:54:02:aa:bb:cc"
+        interface: "vnet0"
+      - name: "data-plane"
+        mac: "52:54:02:aa:bb:cd"
+    users: # MANDATORY
+      - name: "sam" # MANDATORY
+        password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # MANDATORY, here 'master'
+        sudo: true
+        keys: # Optional, default '$HOME/.ssh/id_rsa.pub'
+          - "/tmp/freyja-unit-test/config/sam.pub"
+          - "/tmp/freyja-unit-test/config/ext.pub"
+        groups: ["group1", "group2"]
+      - name: "frodo" # MANDATORY
+        password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # MANDATORY, here 'master'ub"
+    storage: 100 # Optional, default '30'
+    memory: 8192 # Optional, default '4096'
+    vcpu: 4 # Optional, default '2'
+    packages: [ "curl", "net-tools" ]
+    cmd:
+      - "echo 'hello world !' > /tmp/test.txt"
+      - "cat /tmp/test.txt"
+    files:
+      - source: "/tmp/freyja-unit-test/config/hello.txt"
+        destination: "/root/hello.txt"
+        permissions : "0700"
+        owner: "root:freyja"
+      - source: "/tmp/freyja-unit-test/config/world.txt"
+        destination: "/home/sam/world.txt"
+  - image: "/tmp/ubuntu-20.04-LTS-20210603.0.x86_64.qcow2" # MANDATORY
+    os: "ubuntu20" # MANDATORY
+    hostname: "vm2" # MANDATORY, MUST NOT contain underscores

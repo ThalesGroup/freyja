@@ -6,17 +6,15 @@ import (
 	"github.com/digitalocean/go-libvirt"
 	"github.com/spf13/cobra"
 	"log"
-	"log/slog"
 	"net/url"
 	"os"
 	"path/filepath"
 )
 
+var Logger = internal.Logger
+
 // Flags
 var verbose bool
-
-// Logger Freyja logger
-var Logger *slog.Logger
 
 // LibvirtConnexion qemu connexion
 var LibvirtConnexion *libvirt.Libvirt
@@ -41,7 +39,6 @@ var rootCmd = &cobra.Command{
 		// Is overridden by 'Run' function of subcommands calls.
 		// Do you processing here
 		// Like command annotations
-		Logger = internal.InitPrettyLogger()
 	},
 	PostRun: func(cmd *cobra.Command, args []string) {
 		// Will be call at the end of any subcommand
@@ -78,7 +75,7 @@ func init() {
 	// machine management
 	rootCmd.AddCommand(MachineCmd)
 	// network management
-	rootCmd.AddCommand(NetworkCmd)
+	rootCmd.AddCommand(networkCmd)
 
 	// Flags
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Activate debug mode") // version flag only for root command

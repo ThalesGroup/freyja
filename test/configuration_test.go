@@ -5,14 +5,13 @@ import (
 	"freyja/internal"
 	"log"
 	"os"
-	"path/filepath"
 	"testing"
 )
 
 // testFilesDir
 //
 //go:embed static/*
-var testFilesDir embed.FS
+var testFilesConfigurationDir embed.FS
 
 // testFileEmptyConfiguration is used to test empty configuration (missing required values)
 const testFileEmptyConfiguration string = "static/empty_conf.yaml"
@@ -23,21 +22,53 @@ const testFileValidDefaultConfiguration string = "static/default_conf.yaml"
 // testFileValidDefaultFilesConfiguration is used to test minimal required values and default values
 const testFileValidDefaultFilesConfiguration string = "static/default_conf_files.yaml"
 
-// testFileValidCompleteConfiguration is used to test all the possible values in a configuration
-const testFileValidCompleteConfiguration string = "static/complete_conf.yaml"
+// TestFileValidCompleteConfiguration is used to test all the possible values in a configuration
+const TestFileValidCompleteConfiguration string = "static/complete_conf.yaml"
 
-func writeTempFile(name string, content []byte) string {
-	dir := "/tmp/freyja-unit-test/config"
-	err := os.MkdirAll(dir, os.ModePerm)
-	if err != nil {
-		log.Panicf("Could not create unit test dir '%s' : %v", dir, err)
+const SamPubFileName string = "sam.pub"
+
+const ExtPubFileName string = "ext.pub"
+
+const HelloFileName string = "hello.txt"
+
+const WorldFileName string = "world.txt"
+
+// ExpectedSamPubContent inject some content in temp file for unit tests
+const ExpectedSamPubFileContent string = "key"
+
+// ExpectedExtPubContent inject some content in temp file for unit tests
+const ExpectedExtPubFileContent string = "key"
+
+// ExpectedHelloContent inject some content in temp file for unit tests
+const ExpectedHelloFileContent string = "hello"
+
+// ExpectedWorldContent inject some content in temp file for unit tests
+const ExpectedWorldFileContent string = "world"
+
+func BuildCompleteConfig() *internal.ConfigurationData {
+	parentDir := "config"
+	// mandatory files for the test
+	WriteTempTestFile(SamPubFileName, parentDir, []byte(ExpectedSamPubFileContent))
+	WriteTempTestFile(ExtPubFileName, parentDir, []byte(ExpectedExtPubFileContent))
+	WriteTempTestFile(HelloFileName, parentDir, []byte(ExpectedHelloFileContent))
+	WriteTempTestFile(WorldFileName, parentDir, []byte(ExpectedWorldFileContent))
+	// build freyja config
+	var c internal.ConfigurationData
+	if err := c.BuildFromFile(TestFileValidCompleteConfiguration); err != nil {
+		log.Printf("Cannot build configuration from file '%s': %v", TestFileValidCompleteConfiguration, err)
+		os.Exit(1)
 	}
-	path := filepath.Join("/tmp/freyja-unit-test/config", name)
-	err = os.WriteFile(path, content, 0660)
-	if err != nil {
-		log.Panicf("Could not write temp unit test file '%s' : %v", path, err)
+	return &c
+}
+
+func BuildDefaultConfig() *internal.ConfigurationData {
+	// build freyja config
+	var c internal.ConfigurationData
+	if err := c.BuildFromFile(testFileValidDefaultConfiguration); err != nil {
+		log.Printf("Cannot build configuration from file '%s': %v", testFileValidDefaultConfiguration, err)
+		os.Exit(1)
 	}
-	return path
+	return &c
 }
 
 func compareOrderedStringSlices(slice1 []string, slice2 []string) bool {
@@ -71,21 +102,11 @@ func replaceFirstConfFile(c *internal.ConfigurationData, f *internal.Configurati
 }
 
 func TestValidate(t *testing.T) {
-	// build config
-	// mandatory files for the test
-	writeTempFile("sam.pub", []byte("key"))
-	writeTempFile("ext.pub", []byte("key"))
-	writeTempFile("hello.txt", []byte("hello"))
-	writeTempFile("world.txt", []byte("world"))
-	var c internal.ConfigurationData
-	if err := c.BuildFromFile(testFileValidCompleteConfiguration); err != nil {
-		log.Printf("Cannot build configuration from file '%s': %v", testFileValidDefaultConfiguration, err)
-		t.Fail()
-	}
-	testValidateVersion(t, &c)
-	testValidateNetwork(t, &c)
-	testValidateUser(t, &c)
-	testValidateFiles(t, &c)
+	c := BuildCompleteConfig()
+	testValidateVersion(t, c)
+	testValidateNetwork(t, c)
+	testValidateUser(t, c)
+	testValidateFiles(t, c)
 }
 
 func testValidateVersion(t *testing.T, c *internal.ConfigurationData) {
@@ -151,7 +172,7 @@ func testValidateNetwork(t *testing.T, c *internal.ConfigurationData) {
 
 func testValidateUser(t *testing.T, c *internal.ConfigurationData) {
 	configurationUser := c.Machines[0].Users[0]
-	tempFile := writeTempFile("test-valid-user-key.pub", []byte("test"))
+	tempFile := WriteTempTestFile("test-valid-user-key.pub", "config", []byte("test"))
 	// invalid
 	configurationUser.Keys = append(configurationUser.Keys, "dumb")
 	replaceFirstConfUser(c, &configurationUser)
@@ -183,7 +204,7 @@ func testValidateFiles(t *testing.T, c *internal.ConfigurationData) {
 		}
 	}
 	// valid values
-	tempFile := writeTempFile("test-valid-file-source.txt", []byte("test"))
+	tempFile := WriteTempTestFile("test-valid-file-source.txt", "config", []byte("test"))
 	values = []string{tempFile, "/dev/null"}
 	for _, value := range values {
 		configurationFile.Source = value
@@ -372,17 +393,7 @@ func TestBuildDefaultFilesConfig(t *testing.T) {
 
 // TestBuildCompleteConfig checks all the values that can be set in a configuration
 func TestBuildCompleteConfig(t *testing.T) {
-	// mandatory files for the test
-	writeTempFile("sam.pub", []byte("key"))
-	writeTempFile("ext.pub", []byte("key"))
-	writeTempFile("hello.txt", []byte("hello"))
-	writeTempFile("world.txt", []byte("world"))
-	// build config
-	var c internal.ConfigurationData
-	if err := c.BuildFromFile(testFileValidCompleteConfiguration); err != nil {
-		log.Printf("Cannot build configuration from file '%s': %v", testFileValidCompleteConfiguration, err)
-		t.Fail()
-	}
+	c := BuildCompleteConfig()
 	// test config
 	// VERSION, HOSTNAME, OS AND IMAGE VALUES ARE ALREADY TESTED IN THE DEFAULT CONFIG TEST
 	if len(c.Machines) != 2 {
@@ -439,7 +450,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 		t.Fail()
 	}
 	// user groups
-	u1ExpectedGroups := []string{"sudo", "freyja"}
+	u1ExpectedGroups := []string{"group1", "group2"}
 	if !compareOrderedStringSlices(u1ExpectedGroups, u1.Groups) {
 		t.Logf("expected user groups '%v' but got '%v'", u1ExpectedGroups, u1.Groups)
 		t.Fail()
@@ -499,6 +510,16 @@ func TestBuildCompleteConfig(t *testing.T) {
 	f2 := m1.Files[1]
 	if f2.Source != "/tmp/freyja-unit-test/config/world.txt" {
 		t.Logf("expected file source '/tmp/freyja-unit-test/config/world.txt' but got '%s'", f2.Source)
+		t.Fail()
+	}
+	// update
+	if !m1.Update {
+		t.Logf("expected update 'true' but got 'false'")
+		t.Fail()
+	}
+	// reboot
+	if !m1.Reboot {
+		t.Logf("expected reboot 'true' but got 'false'")
 		t.Fail()
 	}
 	// just testing mandatory values of machine 2 to make sure that the 2 machines are considered

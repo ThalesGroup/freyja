@@ -397,9 +397,18 @@ type ConfigurationFile struct {
 	Owner       string `yaml:"owner"`
 }
 
-// CloudInitData is the configuration specification, expressed in YAML here.
-// Compliant with version 24.2
-// Exemple from https://cloudinit.readthedocs.io/en/latest/reference/examples.html :
+// CloudInitMetadata is the user metadata configuration specifications
+type CloudInitMetadata struct {
+	InstanceID    string `yaml:"instance"`       // = machine hostname
+	LocalHostname string `yaml:"local-hostname"` // = machine hostname
+}
+
+// CloudInitUserData is the user configuration specification with cloud-init specifications.
+// The format used here is YAML.
+// This format is mandatory to generate the ISO9660 disk image file for machine provisioning.
+// Compliant with cloud-init version 24.2
+// Example from https://cloudinit.readthedocs.io/en/latest/reference/examples.html :
+// Specs from https://cloudinit.readthedocs.io/en/latest/reference/modules.html
 //
 // #cloud-config
 // hostname: debian12
@@ -443,17 +452,33 @@ type ConfigurationFile struct {
 //	message: First reboot
 //	timeout: 30
 //	condition: True
-type CloudInitData struct {
-	Hostname string              `yaml:"hostname"`
-	Output   CloudInitDataOutput `yaml:"output"`
-	Users    []CloudInitDataUser `yaml:"users"`
+type CloudInitUserData struct {
+	Hostname       string                       `yaml:"hostname"` // MANDATORY
+	Output         *CloudInitUserDataOutput     `yaml:"output"`
+	Users          []CloudInitUserDataUser      `yaml:"users"`                 // MANDATORY ??
+	PackageUpdate  bool                         `yaml:"package_update"`        // default : false
+	PackageUpgrade bool                         `yaml:"package_upgrade"`       // default : false
+	Packages       []string                     `yaml:"packages,omitempty"`    // default: empty
+	WriteFiles     []CloudInitUserDataFiles     `yaml:"write_files,omitempty"` // default: empty
+	RunCmd         []string                     `yaml:"runcmd,omitempty"`      // default: empty
+	PowerState     *CloudInitUserDataPowerState `yaml:"power_state,omitempty"` // default: nil
 }
 
-type CloudInitDataOutput struct {
+const CloudInitUserDataOutputAllString = ">> /var/log/cloud-init.log"
+
+type CloudInitUserDataOutput struct {
 	All string `yaml:"all"`
 }
 
-// CloudInitDataUser
+const CloudInitUserDataUserSudoString string = "ALL=(ALL) NOPASSWD:ALL"
+
+func GetCloudInitUserDataUserSudoStringConst() []string {
+	return []string{CloudInitUserDataUserSudoString}
+}
+
+const CloudInitUserDataUserShellString = "/bin/bash"
+
+// CloudInitUserDataUser
 // name: "freyja"
 // sudo: [ 'ALL=(ALL) NOPASSWD:ALL' ]
 // lock_passwd: false
@@ -462,12 +487,46 @@ type CloudInitDataOutput struct {
 // groups: sudo
 // ssh_authorized_keys:
 // - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILISxfJd/91TY9DH97/Y6t2zejV8p0x7L4Ygjy45iMPp kaio@kaio-host
-type CloudInitDataUser struct {
-	Name string `yaml:"name"`
-	// TODO : set only if user is sudoer
-	Sudo string `yaml:"sudo"`
-	//Name string `yaml:"name"`
-	//Name string `yaml:"name"`
-	//Name string `yaml:"name"`
-	//Name string `yaml:"name"`
+type CloudInitUserDataUser struct {
+	Name              string   `yaml:"name"`           // MANDATORY
+	Sudo              []string `yaml:"sudo,omitempty"` // example if sudo : [ 'ALL=(ALL) NOPASSWD:ALL' ]
+	LockPasswd        bool     `yaml:"lock_passwd"`    // default: false
+	Shell             string   `yaml:"shell"`          // default: /bin/bash
+	Passwd            string   `yaml:"passwd"`
+	Groups            string   `yaml:"groups,omitempty"` // comma-separated string, ex: freyja, libvirt, sudo
+	SshAuthorizedKeys []string `yaml:"ssh_authorized_keys,omitempty"`
+}
+
+const CloudInitUserDataFilesEncoding = "base64"
+
+// CloudInitUserDataFiles
+// content: aGVsbG8gd29ybGQhCg==
+// encoding: base64
+// path: /home/freyja/hello.txt
+// permissions: 0760
+// owner: freyja:freyja
+type CloudInitUserDataFiles struct {
+	Content     string `yaml:"content"`
+	Encoding    string `yaml:"encoding"` // = base64
+	Path        string `yaml:"path"`
+	Permissions string `yaml:"permissions,omitempty"`
+	Owner       string `yaml:"owner,omitempty"`
+}
+
+const CloudInitUserPowerStateMode string = "reboot"
+const CloudInitUserPowerStateMessage string = "First reboot"
+const CloudInitUserPowerStateTimeout = uint(30)
+const CloudInitUserPowerStateCondition bool = true
+
+// CloudInitUserDataPowerState if reboot is needed. all are default values
+//
+//	mode: reboot
+//	message: First reboot
+//	timeout: 30
+//	condition: True
+type CloudInitUserDataPowerState struct {
+	Mode      string `yaml:"mode"`      // = reboot
+	Message   string `yaml:"message"`   // = First reboot
+	Timeout   uint   `yaml:"timeout"`   // = 30 (seconds)
+	Condition bool   `yaml:"condition"` // = True
 }

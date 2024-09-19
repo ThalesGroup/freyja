@@ -19,7 +19,9 @@ var verbose bool
 // LibvirtConnexion qemu connexion
 var LibvirtConnexion *libvirt.Libvirt
 
-var FreyjaWorkspaceDir = filepath.Join(os.Getenv("HOME"), "freyja-workspace")
+var FreyjaWorkspaceDir = filepath.Join(os.Getenv("HOME"), ".freyja")
+
+var FreyjaMachinesWorkspaceDir = filepath.Join(FreyjaWorkspaceDir, "machines")
 
 //go:embed templates
 var Templates embed.FS

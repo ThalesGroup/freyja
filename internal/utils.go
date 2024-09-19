@@ -1,6 +1,7 @@
 package internal
 
 import (
+	b64 "encoding/base64"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
@@ -60,4 +61,8 @@ func AskUserYesNoConfirmation() (bool, error) {
 		return false, &UserInputError{Message: fmt.Sprintf("unexpected user input: %s", choice)}
 	}
 
+}
+
+func EncodeB64Bytes(b []byte) string {
+	return b64.StdEncoding.EncodeToString(b)
 }

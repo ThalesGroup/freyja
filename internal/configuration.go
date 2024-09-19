@@ -12,7 +12,6 @@ import (
 type Configuration interface {
 	Validate() error
 	BuildFromFile(path string) error
-	GetData() ConfigurationData
 }
 
 // Validate audits the whole freyja configuration for content mistakes
@@ -109,22 +108,26 @@ func (cf *ConfigurationFile) validateFiles() error {
 		return errors.New(fmt.Sprintf("configuration not found : '%s' does not exist", cf.Source))
 	}
 	// validate permissions
-	pattern := "^[0-7]{4}$"
-	match, err := regexp.MatchString(pattern, cf.Permissions)
-	if err != nil {
-		return fmt.Errorf("cannot verify pattern matching for string '%s'. Should be '^[0-7]{4}$'. Reason : %w", cf.Permissions, err)
-	}
-	if !match {
-		return errors.New(fmt.Sprintf("wrong file permissions : value '%s' does not match pattern '%s'", cf.Permissions, pattern))
+	if cf.Permissions != "" {
+		pattern := "^[0-7]{4}$"
+		match, err := regexp.MatchString(pattern, cf.Permissions)
+		if err != nil {
+			return fmt.Errorf("cannot verify pattern matching for string '%s'. Should be '^[0-7]{4}$'. Reason : %w", cf.Permissions, err)
+		}
+		if !match {
+			return errors.New(fmt.Sprintf("wrong file permissions : value '%s' does not match pattern '%s'", cf.Permissions, pattern))
+		}
 	}
 	// validate owner
-	pattern = "^[a-zA-Z0-9_]*:[a-zA-Z0-9_]*$"
-	match, err = regexp.MatchString(pattern, cf.Owner)
-	if err != nil {
-		return fmt.Errorf("cannot verify pattern matching for string '%s'. Should be '^[a-zA-Z0-9_]*:[a-zA-Z0-9_]*$'. Reason : %w", cf.Owner, err)
-	}
-	if !match {
-		return errors.New(fmt.Sprintf("wrong file owner : value '%s' does not match pattern '%s'", cf.Owner, pattern))
+	if cf.Owner != "" {
+		pattern := "^[a-zA-Z0-9_]*:[a-zA-Z0-9_]*$"
+		match, err := regexp.MatchString(pattern, cf.Owner)
+		if err != nil {
+			return fmt.Errorf("cannot verify pattern matching for string '%s'. Should be '^[a-zA-Z0-9_]*:[a-zA-Z0-9_]*$'. Reason : %w", cf.Owner, err)
+		}
+		if !match {
+			return errors.New(fmt.Sprintf("wrong file owner : value '%s' does not match pattern '%s'", cf.Owner, pattern))
+		}
 	}
 	return nil
 }
@@ -186,17 +189,17 @@ func (c *ConfigurationData) setDefaultValues() {
 			// default '1' vcpu
 			machine.Vcpu = DefaultMachineVcpu
 		}
-		if len(machine.Files) != 0 {
-			for j, file := range machine.Files {
-				if file.Permissions == "" {
-					file.Permissions = DefaultFilePermissions
-				}
-				if file.Owner == "" {
-					file.Owner = DefaultFileOwner
-				}
-				machine.Files[j] = file
-			}
-		}
+		//if len(machine.Files) != 0 {
+		//	for j, file := range machine.Files {
+		//		if file.Permissions == "" {
+		//			file.Permissions = DefaultFilePermissions
+		//		}
+		//		if file.Owner == "" {
+		//			file.Owner = DefaultFileOwner
+		//		}
+		//		machine.Files[j] = file
+		//	}
+		//}
 
 		c.Machines[i] = machine
 	}

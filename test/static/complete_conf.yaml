@@ -34,6 +34,8 @@ machines:
         owner: "root:freyja"
       - source: "/tmp/freyja-unit-test/config/world.txt"
         destination: "/home/sam/world.txt"
+    update: true
+    reboot: true
   - image: "/tmp/ubuntu-20.04-LTS-20210603.0.x86_64.qcow2" # MANDATORY
     os: "ubuntu20" # MANDATORY
     hostname: "vm2" # MANDATORY, MUST NOT contain underscores

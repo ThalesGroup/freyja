@@ -221,7 +221,7 @@ func TestBuildUserDataCloudInitCompleteConfig(t *testing.T) {
 		t.Errorf("Expected user name '%s' but got '%s'", expectedU1Passwd, u1.Passwd)
 		t.Fail()
 	}
-	expectedU1Groups := "group1,group2"
+	expectedU1Groups := "group1,group2,sudo"
 	if u1.Groups != expectedU1Groups {
 		t.Errorf("Expected user groups '%s' but got '%s'", expectedU1Groups, u1.Groups)
 		t.Fail()

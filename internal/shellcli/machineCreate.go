@@ -3,6 +3,7 @@ package shellcli
 import (
 	"fmt"
 	"freyja/internal"
+	"github.com/kdomanski/iso9660"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 	"log"
@@ -39,7 +40,7 @@ var machineCreateCmd = &cobra.Command{
 				Logger.Error("cannot create machine workspace directory", "machine", machine.Hostname, "reason", err)
 				os.Exit(1)
 			}
-			// cloud init specs dump YAML file
+			// create cloud init metadata and user data files
 			cloudInitFilePath := filepath.Join(machinePath, fmt.Sprintf("%s.clinit", machine.Hostname))
 			b, err := yaml.Marshal(cloudInitData)
 			if err != nil {
@@ -51,13 +52,62 @@ var machineCreateCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
+			doit := false
+			if doit {
+				// TODO :
+				//  - try to use genisoimage or similar in order to create the iso image from the cloud init file:
+				//  for example, 'xorriso' or 'genisoimage' are two utilities to generate ISO images from cloud init files, according to the RFC9660 specifications
+				//    https://github.com/kdomanski/iso9660
+				//cloudconfig.New()
+				isoWriter, err := iso9660.NewWriter()
+				if err != nil {
+					Logger.Error("cannot create the iso9660 writer for the image", "image", machine.Hostname, "reason", err)
+					os.Exit(1)
+				}
+				// add cloud init metadata
+				// todo: provide the cloud init metadata file path
+				fm, err := os.Open("/metadata-file")
+				if err != nil {
+					Logger.Error("")
+					os.Exit(1)
+				}
+				defer fm.Close()
+				if err = isoWriter.AddFile(fm, "meta-data"); err != nil {
+					Logger.Error("")
+					os.Exit(1)
+				}
+				// add cloud init user data
+				// todo: provide the cloud init user data file path
+				fu, err := os.Open("/userdata-file")
+				if err != nil {
+					Logger.Error("")
+					os.Exit(1)
+				}
+				defer fu.Close()
+				if err = isoWriter.AddFile(fu, "user-data"); err != nil {
+					Logger.Error("")
+					os.Exit(1)
+				}
+				// write iso on filesystem
+				// todo: provide the iso output file path
+				outputFile, err := os.OpenFile("/home/user/output.iso", os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0644)
+				if err != nil {
+					Logger.Error("")
+					os.Exit(1)
+				}
+				// todo: provide a dedicated volume id for this iso image
+				if err = isoWriter.WriteTo(outputFile, "volume id"); err != nil {
+					Logger.Error("")
+					os.Exit(1)
+				}
+				if err = outputFile.Close(); err != nil {
+					Logger.Error("")
+					os.Exit(1)
+				}
+			}
+
 		}
 
-		// TODO :
-		//   - build and create the cloud-init from model, using the go module for cloud init
-		//   - build and create the vm configuration from model
-		//   - create the domain using libvirt with the cloud init iso file for boot provisioning
-		//cloudconfig.New()
 	},
 }
 

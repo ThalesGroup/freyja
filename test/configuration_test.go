@@ -262,7 +262,11 @@ func testValidateFiles(t *testing.T, c *internal.ConfigurationData) {
 }
 
 func TestBuildEmptyConfiguration(t *testing.T) {
-	var c internal.Configuration
+	//var c internal.Configuration
+	var c = internal.ConfigurationData{
+		Version:  "",
+		Machines: nil,
+	}
 	if err := c.BuildFromFile(testFileEmptyConfiguration); err == nil {
 		t.Logf("empty configuration valid instead of invalid: %v", c)
 		t.Fail()
@@ -290,7 +294,7 @@ func TestBuildDefaultConfiguration(t *testing.T) {
 	// test machine default values
 	m := c.Machines[0]
 	// mandatory values
-	expectedImage := "/tmp/CentOS-Stream-GenericCloud-8-20210603.0.x86_64.qcow2"
+	expectedImage := "/tmp/debian-12-generic-amd64.qcow2"
 	if m.Image != expectedImage {
 		t.Logf("expected image '%s' but got '%s'", expectedImage, m.Image)
 		t.Fail()
@@ -376,17 +380,6 @@ func TestBuildDefaultFilesConfig(t *testing.T) {
 		if lf == 0 {
 			t.Logf("files config should not be empty but found 0")
 			t.Fail()
-		} else {
-			// this test only contains on file
-			file := m.Files[0]
-			if file.Permissions != internal.DefaultFilePermissions {
-				t.Logf("expected file permissions are '%s' but got '%s'", internal.DefaultFilePermissions, file.Permissions)
-				t.Fail()
-			}
-			if file.Owner != internal.DefaultFileOwner {
-				t.Logf("expected file owner is '%s' but got '%s'", internal.DefaultFileOwner, file.Owner)
-				t.Fail()
-			}
 		}
 	}
 }

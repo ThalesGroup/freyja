@@ -263,10 +263,7 @@ func testValidateFiles(t *testing.T, c *internal.ConfigurationData) {
 
 func TestBuildEmptyConfiguration(t *testing.T) {
 	//var c internal.Configuration
-	var c = internal.ConfigurationData{
-		Version:  "",
-		Machines: nil,
-	}
+	var c internal.ConfigurationData
 	if err := c.BuildFromFile(testFileEmptyConfiguration); err == nil {
 		t.Logf("empty configuration valid instead of invalid: %v", c)
 		t.Fail()

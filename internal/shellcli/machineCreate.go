@@ -1,11 +1,9 @@
 package shellcli
 
 import (
-	"fmt"
 	"freyja/internal"
 	"github.com/kdomanski/iso9660"
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
 	"log"
 	"os"
 	"path/filepath"
@@ -35,23 +33,17 @@ var machineCreateCmd = &cobra.Command{
 				os.Exit(1)
 			}
 			// create machine directory
-			machinePath, err := createMachineDir(&machine)
+			machineDirPath, err := createMachineDir(&machine)
 			if err != nil {
 				Logger.Error("cannot create machine workspace directory", "machine", machine.Hostname, "reason", err)
 				os.Exit(1)
 			}
 			// create cloud init metadata and user data files
-			cloudInitFilePath := filepath.Join(machinePath, fmt.Sprintf("%s.clinit", machine.Hostname))
-			b, err := yaml.Marshal(cloudInitData)
-			if err != nil {
-				Logger.Error("cannot parse cloud init data into YAML", "data", cloudInitData, "reason", err)
+			if err := internal.GenerateCloudInitConfigs(&machine, machineDirPath); err != nil {
+				Logger.Error("cannot create machine cloud init configurations", "machine", machine.Hostname, "reason", err)
 				os.Exit(1)
 			}
-			if err := os.WriteFile(cloudInitFilePath, b, os.ModePerm); err != nil {
-				Logger.Error("cannot write cloud init YAML specs on filesystem", "path", cloudInitFilePath, "reason", err)
-				os.Exit(1)
-			}
-
+			// create iso from user inputs
 			doit := false
 			if doit {
 				// TODO :

@@ -33,9 +33,9 @@ func writeCloudInitConfig(directory string, filename string, ci interface{}) err
 // METADATA
 //
 
-const CloudInitMetadataFileSuffix = "_metadata.clinit"
+const CloudInitMetadataFileSuffix = "-cloudinit-metadata.yaml"
 
-const CloudInitUserDataFileSuffix = "_user_data.clinit"
+const CloudInitUserDataFileSuffix = "-cloudinit-userdata.yaml"
 
 func (ci *CloudInitMetadata) Build(machine *ConfigurationMachine) error {
 	ci.InstanceID = machine.Hostname
@@ -44,8 +44,7 @@ func (ci *CloudInitMetadata) Build(machine *ConfigurationMachine) error {
 }
 
 func (ci *CloudInitMetadata) Write(directory string) error {
-	filename := fmt.Sprintf("%s%s", ci.LocalHostname, CloudInitMetadataFileSuffix)
-	return writeCloudInitConfig(directory, filename, &ci)
+	return writeCloudInitConfig(directory, GetCloudInitMetadataFilename(ci.LocalHostname), &ci)
 }
 
 // USER DATA
@@ -126,6 +125,41 @@ func (ci *CloudInitUserData) Build(machine *ConfigurationMachine) error {
 }
 
 func (ci *CloudInitUserData) Write(directory string) error {
-	filename := fmt.Sprintf("%s%s", ci.Hostname, CloudInitUserDataFileSuffix)
-	return writeCloudInitConfig(directory, filename, &ci)
+	return writeCloudInitConfig(directory, GetCloudInitUserDataFilename(ci.Hostname), &ci)
+}
+
+//
+// UTILS
+//
+
+func GenerateCloudInitConfigs(machine *ConfigurationMachine, outputDir string) error {
+	// metadata generation
+	var cm CloudInitMetadata
+	if err := cm.Build(machine); err != nil {
+		msg := fmt.Sprintf("cannot build cloud init metadata for machine '%s'", machine.Hostname)
+		return fmt.Errorf(msg, err)
+	}
+	if err := cm.Write(outputDir); err != nil {
+		msg := fmt.Sprintf("cannot write cloud init metadata file for machine '%s'", machine.Hostname)
+		return fmt.Errorf(msg, err)
+	}
+	// user data generation
+	var cu CloudInitUserData
+	if err := cu.Build(machine); err != nil {
+		msg := fmt.Sprintf("cannot build cloud init user data for machine '%s'", machine.Hostname)
+		return fmt.Errorf(msg, err)
+	}
+	if err := cu.Write(outputDir); err != nil {
+		msg := fmt.Sprintf("cannot write cloud init user data file for machine '%s'", machine.Hostname)
+		return fmt.Errorf(msg, err)
+	}
+	return nil
+}
+
+func GetCloudInitMetadataFilename(hostname string) string {
+	return fmt.Sprintf("%s%s", hostname, CloudInitMetadataFileSuffix)
+}
+
+func GetCloudInitUserDataFilename(hostname string) string {
+	return fmt.Sprintf("%s%s", hostname, CloudInitUserDataFileSuffix)
 }

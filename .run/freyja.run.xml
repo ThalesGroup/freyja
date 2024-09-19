@@ -2,7 +2,7 @@
   <configuration default="false" name="freyja" type="GoApplicationRunConfiguration" factoryName="Go Application">
     <module name="freyja" />
     <working_directory value="$PROJECT_DIR$" />
-    <parameters value="machine create -c " />
+    <parameters value="machine create -c $PROJECT_DIR$/test/static/default_conf.yaml" />
     <kind value="PACKAGE" />
     <package value="freyja/cmd/freyja" />
     <directory value="$PROJECT_DIR$" />

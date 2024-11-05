@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
-	"math"
 	"os"
 )
 
@@ -20,21 +19,23 @@ func CheckIfFileExists(path string) error {
 	return nil
 }
 
-func KibToGB(kib uint64) float64 {
-	return float64(kib) * 1.024 * math.Pow10(-6)
+// KibToGiB
+// byte to kb = float(n)/(1<<10)
+// byte to mb = float(n)/(1<<20)
+// byte to gb = float(n)/(1<<30)
+// 1<<10 = 2^10. = 1024
+// 1<<20 = 2^20 = 1024*1024
+// ...
+func KibToGiB(kib uint64) float64 {
+	return float64(kib) / (1 << 20)
 }
 
-func BytesToGB(by uint64) float64 {
-	return float64(by) / math.Pow(2.0, 30)
+func MiBToKiB(GiB uint64) float64 {
+	return float64(GiB) * (1 << 10)
 }
 
-// Truncate truncates a float into a certain decimals after the first one. Ex :
-// Truncate(1.123456789, 2) = 1.12
-// Truncate(1.123456789, 4) = 1.1234
-func Truncate(num float64, precision int) float64 {
-	output := math.Pow(10, float64(precision))
-	round := int(num + math.Copysign(0.5, num))
-	return float64(round) / output
+func BytesToGiB(by uint64) float64 {
+	return float64(by) / (1 << 30)
 }
 
 // AskUserYesNoConfirmation returns true if user confirmed 'yes', false otherwise.
@@ -65,4 +66,17 @@ func AskUserYesNoConfirmation() (bool, error) {
 
 func EncodeB64Bytes(b []byte) string {
 	return b64.StdEncoding.EncodeToString(b)
+}
+
+func CopyFile(source string, destination string, destinationPermissions os.FileMode) error {
+	// read
+	sourceContent, err := os.ReadFile(source)
+	if err != nil {
+		return fmt.Errorf("cannot read source file '%s': %w", source, err)
+	}
+	// write
+	if err = os.WriteFile(destination, sourceContent, destinationPermissions); err != nil {
+		return fmt.Errorf("cannot write copy file '%s': %w", destination, err)
+	}
+	return nil
 }

@@ -14,16 +14,28 @@ type CloudInitConfiguration interface {
 }
 
 func writeCloudInitConfig(directory string, filename string, ci interface{}) error {
+	// create the config dir if it does exist yet
 	err := os.MkdirAll(directory, os.ModePerm)
 	if err != nil {
 		return fmt.Errorf("could not create cloud init into parent directory '%s' for file '%s': %w", directory, filename, err)
 	}
+	// convert cloud init config to bytes
 	metadata, err := yaml.Marshal(&ci)
 	if err != nil {
 		return fmt.Errorf("could not parse cloud init config file '%s' into bytes: %w", filename, err)
 	}
+	// open the file to inject multiple data
 	path := filepath.Join(directory, filename)
-	if err := os.WriteFile(path, metadata, os.ModePerm); err != nil {
+	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0770)
+	if err != nil {
+		return fmt.Errorf("could not open cloud init config file '%s': %w", path, err)
+	}
+	// inject the mandatory '#cloud-config' string at the beginning of the file
+	if _, err = file.WriteString(CloudInitUserDataHeader); err != nil {
+		return fmt.Errorf("could not write cloud init config for machine '%s' into file '%s': %w", filename, path, err)
+	}
+	// inject the cloud init user data
+	if _, err = file.Write(metadata); err != nil {
 		return fmt.Errorf("could not write cloud init config for machine '%s' into file '%s': %w", filename, path, err)
 	}
 	return nil

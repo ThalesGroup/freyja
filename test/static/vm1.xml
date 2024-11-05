@@ -1,0 +1,40 @@
+<!-- virsh define vm_name.xml -->
+<domain type="kvm">
+    <name>vm1</name>
+    <description>vm1</description>
+    <uuid>7b11e3d1-b4ef-77af-7e81-aa2aba7af47f</uuid>
+    <vcpu placement="static">1</vcpu>
+    <memory unit="KiB">4194304</memory>
+    <os>
+        <type arch="x86_64">hvm</type>
+        <boot dev="hd" />
+    </os>
+    <devices>
+        <emulator>/usr/bin/qemu-system-x86_64</emulator>
+        <disk device="disk" type="file">
+            <driver name="qemu" type="qcow2" cache="none"></driver>
+            <source file="/home/kaio/.freyja/machines/vm1/vm1-overlay-image.qcow2"></source>
+            <backingStore type="file">
+                <format type="qcow2"></format>
+                <source file="/tmp/debian-12-generic-amd64.qcow2"></source>
+            </backingStore>
+            <target bus="virtio" dev="vda"></target>
+        </disk>
+        <disk device="disk" type="file">
+            <source file="/home/kaio/.freyja/machines/vm1/vm1-cloud-init.iso"></source>
+            <target bus="virtio" dev="vdb"></target>
+        </disk>
+        <interface type="network">
+            <source bridge="virbr0" network="default"></source>
+            <model type="virtio"></model>
+        </interface>
+        <serial type="pty">
+            <target type="isa-serial" port="0">
+                <model name="isa-serial"></model>
+            </target>
+        </serial>
+        <console type="pty">
+            <target type="serial" port="0"></target>
+        </console>
+    </devices>
+</domain>

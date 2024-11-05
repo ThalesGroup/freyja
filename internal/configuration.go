@@ -217,10 +217,3 @@ func (c *ConfigurationData) setUsers() {
 		c.Machines[i] = machine
 	}
 }
-
-func (cm ConfigurationMachine) parseToXmlDomainDescription() (*XMLDomainDescription, error) {
-	// TODO
-	//  - parse the config to xmldescription
-	//  - use this function to create a domain from xml
-	return nil, nil
-}

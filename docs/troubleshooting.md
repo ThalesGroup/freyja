@@ -129,3 +129,10 @@ Then run :
 ```sh
 ./build.sh
 ```
+
+## Debug a cloud-init file
+
+```sh
+sudo apt install cloud-init
+cloud-init schema -c myvm-cloudinit-userdata.yaml --annotate
+```

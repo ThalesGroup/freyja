@@ -2,6 +2,114 @@ package internal
 
 import "encoding/xml"
 
+type OSArch string
+
+type MemoryUnit string
+
+type LibOsInfoId string
+
+type DevicesEmulator string
+
+type DeviceDiskClass string
+
+type DeviceDiskType string
+
+type DeviceDiskDriverName string
+
+type DeviceDiskDriverType string
+
+type DeviceDiskTargetBus string
+
+type DeviceDiskTargetDev string
+
+type DeviceInterfaceType string
+
+type DeviceSerialType string
+
+type DeviceSerialTargetType string
+
+type DeviceSerialTargetModelName string
+
+type DeviceConsoleType string
+
+type DeviceConsoleTargetType string
+
+const (
+	X86OSArch OSArch = "x86_64"
+)
+
+const (
+	KiBMemoryUnit MemoryUnit = "KiB"
+)
+
+const (
+	QemuX86DevicesEmulator DevicesEmulator = "/usr/bin/qemu-system-x86_64"
+)
+
+const (
+	DiskDeviceType  DeviceDiskClass = "disk"
+	CdromDeviceType DeviceDiskClass = "cdrom"
+)
+
+const (
+	FileDeviceDiskType DeviceDiskType = "file"
+)
+
+const (
+	QemuDeviceDiskDriverName DeviceDiskDriverName = "qemu"
+)
+
+const (
+	QcowDeviceDiskDriverType DeviceDiskDriverType = "qcow2"
+	RawDeviceDiskDriverType  DeviceDiskDriverType = "raw"
+)
+
+const (
+	VirtioDeviceDiskTargetBus DeviceDiskTargetBus = "virtio"
+	SataDeviceDiskTargetBus   DeviceDiskTargetBus = "sata"
+)
+
+const (
+	VdaDeviceDiskTargetDev DeviceDiskTargetDev = "vda"
+	SdaDeviceDiskTargetDev DeviceDiskTargetDev = "sda"
+)
+
+const (
+	NetworkDeviceInterfaceType DeviceInterfaceType = "network"
+)
+
+const (
+	PtyDeviceSerialType DeviceSerialType = "pty"
+)
+
+const (
+	IsaDeviceSerialTargetType DeviceSerialTargetType = "isa-serial"
+)
+
+const (
+	IsaDeviceSerialTargetModelName DeviceSerialTargetModelName = "isa-serial"
+)
+
+const (
+	PtyDeviceConsoleType DeviceConsoleType = "pty"
+)
+
+const (
+	SerialDeviceConsoleTargetType DeviceConsoleType = "serial"
+)
+
+const DefaultDomainType string = "kvm"
+
+const DefaultDeviceInterfaceType = string(NetworkDeviceInterfaceType)
+
+const DefaultInterfaceSourceBridge string = "virbr0"
+
+const DefaultInterfaceModelType string = "virtio"
+
+const DefaultInterfaceSourceNetwork string = "default"
+
+const DefaultOsType string = "hvm"
+
 // DefaultUserName = freyja
 const DefaultUserName string = "freyja"
 
@@ -17,11 +125,18 @@ const DefaultMachineMemory uint = 4096
 // DefaultMachineVcpu = 1 vcpu
 const DefaultMachineVcpu uint = 1
 
-// DefaultFilePermissions sets the read-only permission to the owner
-const DefaultFilePermissions string = "0600"
-
-// DefaultFileOwner sets the owner to root
-const DefaultFileOwner string = "root:root"
+var DefaultDeviceInterface XMLDomainDescriptionDevicesInterface = XMLDomainDescriptionDevicesInterface{
+	Type: DefaultDeviceInterfaceType,
+	// TODO : can the mac address remain nil ?
+	//Mac:     nil,
+	Source: &XMLDomainDescriptionDevicesInterfaceSource{
+		Bridge:  DefaultInterfaceSourceBridge,
+		Network: DefaultInterfaceSourceNetwork,
+	},
+	Model: &XMLDomainDescriptionDevicesInterfaceModel{
+		Type: DefaultInterfaceModelType,
+	},
+}
 
 // XMLDomainDescription
 // Assuming you have the XML description already obtained from the domain object
@@ -31,67 +146,89 @@ const DefaultFileOwner string = "root:root"
 // <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 // <domain id="1" type="kvm">
 //
-//	<name>debian12</name>
-//	<uuid>716f0ab7-6382-4503-bdc3-0d5bc1765277</uuid>
-//	<description>debian12</description>
-//	<metadata>
-//	    <libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0">
-//	        <libosinfo:os id="http://debian.org/debian/12"/>
-//	    </libosinfo:libosinfo>
-//	</metadata>
-//	<memory unit="KiB">4194304</memory>
-//	<currentMemory unit="KiB">4194304</currentMemory>
-//	<vcpu placement="static">2</vcpu>
-//	<os>
-//	    <type arch="x86_64" machine="pc-q35-7.2">hvm</type>
-//	    <boot dev="hd"/>
-//	</os>
-//	<devices>
-//	    <emulator>/usr/bin/qemu-system-x86_64</emulator>
-//	    <disk device="disk" type="file">
-//	        <driver name="qemu" type="qcow2"/>
-//	        <source file="/home/kaio/freyja-workspace/build/debian12/debian12_vdisk.debian12" index="2"/>
-//	        <backingStore index="3" type="file">
-//	            <format type="qcow2"/>
-//	            <source file="/home/kaio/Images/debian12"/>
-//	            <backingStore/>
-//	        </backingStore>
-//	        <target bus="virtio" dev="vda"/>
-//	        <alias name="virtio-disk0"/>
-//	        <address bus="0x04" domain="0x0000" function="0x0" slot="0x00" type="pci"/>
-//	    </disk>
-//	    <disk device="cdrom" type="file">
-//	        <driver name="qemu" type="raw"/>
-//	        <source file="/home/kaio/freyja-workspace/build/debian12/debian12_cloud_init.iso" index="1"/>
-//	        <backingStore/>
-//	        <target bus="sata" dev="sda"/>
-//	        <readonly/>
-//	        <alias name="sata0-0-0"/>
-//	        <address bus="0" controller="0" target="0" type="drive" unit="0"/>
-//	    </disk>
-//	    <interface type="network">
-//	        <mac address="52:54:00:25:77:0d"/>
-//	        <source bridge="virbr0" network="default" portid="5b2b65a8-8c46-4109-9117-38e4bbef3cd6"/>
-//	        <target dev="vnet0"/>
-//	        <model type="virtio"/>
-//	        <alias name="net0"/>
-//	        <address bus="0x01" domain="0x0000" function="0x0" slot="0x00" type="pci"/>
-//	    </interface>
-//	</devices>
+//		<name>debian12</name>
+//		<uuid>716f0ab7-6382-4503-bdc3-0d5bc1765277</uuid>
+//		<description>debian12</description>
+//		<metadata>
+//		    <libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0">
+//		        <libosinfo:os id="http://debian.org/debian/12"/>
+//		    </libosinfo:libosinfo>
+//		</metadata>
+//		<memory unit="KiB">4194304</memory>
+//		<currentMemory unit="KiB">4194304</currentMemory>
+//		<vcpu placement="static">2</vcpu>
+//		<os>
+//		    <type arch="x86_64" machine="pc-q35-7.2">hvm</type>
+//		    <boot dev="hd"/>
+//		</os>
+//		<devices>
+//		    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+//		    <disk device="disk" type="file">
+//		        <driver name="qemu" type="qcow2"/>
+//		        <source file="/home/kaio/freyja-workspace/build/debian12/debian12_vdisk.debian12" index="2"/>
+//		        <backingStore index="3" type="file">
+//		            <format type="qcow2"/>
+//		            <source file="/home/kaio/Images/debian12"/>
+//		            <backingStore/>
+//		        </backingStore>
+//		        <target bus="virtio" dev="vda"/>
+//		        <alias name="virtio-disk0"/>
+//		        <address bus="0x04" domain="0x0000" function="0x0" slot="0x00" type="pci"/>
+//		    </disk>
+//		    <disk device="cdrom" type="file">
+//		        <driver name="qemu" type="raw"/>
+//		        <source file="/home/kaio/freyja-workspace/build/debian12/debian12_cloud_init.iso" index="1"/>
+//		        <backingStore/>
+//		        <target bus="sata" dev="sda"/>
+//		        <readonly/>
+//		        <alias name="sata0-0-0"/>
+//		        <address bus="0" controller="0" target="0" type="drive" unit="0"/>
+//		    </disk>
+//		    <interface type="network">
+//		        <mac address="52:54:00:25:77:0d"/>
+//		        <source bridge="virbr0" network="default" portid="5b2b65a8-8c46-4109-9117-38e4bbef3cd6"/>
+//		        <target dev="vnet0"/>
+//		        <model type="virtio"/>
+//		        <alias name="net0"/>
+//		        <address bus="0x01" domain="0x0000" function="0x0" slot="0x00" type="pci"/>
+//		    </interface>
+//			<!-- OTHER KIND OF DEVICES TO TEST -->
+//	        <serial type='pty'>
+//	          <target type='isa-serial' port='0'>
+//	            <model name='isa-serial'/>
+//	          </target>
+//	        </serial>
+//	        <console type='pty'>
+//	          <target type='serial' port='0'/>
+//	        </console>
+//	        <input type='mouse' bus='ps2'/>
+//	        <input type='keyboard' bus='ps2'/>
+//	        <audio id='1' type='none'/>
+//	        <memballoon model='virtio'>
+//	          <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x0'/>
+//	        </memballoon>
+//		</devices>
 //
 // </domain>
 type XMLDomainDescription struct {
 	// root
-	XMLName  xml.Name                     `xml:"domain"`
-	Type     string                       `xml:"type,attr"`
-	ID       int                          `xml:"id,attr"`
-	Name     string                       `xml:"name"`
-	UUID     string                       `xml:"uuid"`
-	Memory   uint64                       `xml:"memory"` //KiB
-	Vcpu     uint                         `xml:"vcpu"`
-	OS       XMLDomainDescriptionOS       `xml:"os"`
-	Metadata XMLDomainDescriptionMetadata `xml:"metadata"`
-	Devices  XMLDomainDescriptionDevices  `xml:"devices"`
+	XMLName  xml.Name                      `xml:"domain"`
+	Type     string                        `xml:"type,attr"`
+	ID       string                        `xml:"id,attr"`
+	Name     string                        `xml:"name"`
+	UUID     string                        `xml:"uuid"`
+	Vcpu     uint                          `xml:"vcpu"`
+	Memory   *XMLDomainDescriptionMemory   `xml:"memory"`
+	OS       *XMLDomainDescriptionOS       `xml:"os"`
+	Metadata *XMLDomainDescriptionMetadata `xml:"metadata,omitempty"`
+	Devices  *XMLDomainDescriptionDevices  `xml:"devices"`
+}
+
+// XMLDomainDescriptionMemory
+// <memory unit="KiB">4194304</memory>
+type XMLDomainDescriptionMemory struct {
+	Unit  string `xml:"unit,attr"`
+	Value uint64 `xml:",chardata"`
 }
 
 // XMLDomainDescriptionOS
@@ -102,13 +239,14 @@ type XMLDomainDescription struct {
 //
 // </os>
 type XMLDomainDescriptionOS struct {
-	XMLName xml.Name                   `xml:"os"`
-	Type    XMLDomainDescriptionOSType `xml:"type"`
+	XMLName xml.Name                    `xml:"os"`
+	Type    *XMLDomainDescriptionOSType `xml:"type"`
 }
 
 type XMLDomainDescriptionOSType struct {
 	XMLName xml.Name `xml:"type"`
 	Arch    string   `xml:"arch,attr"`
+	Type    string   `xml:",chardata"`
 }
 
 // XMLDomainDescriptionMetadata
@@ -119,13 +257,13 @@ type XMLDomainDescriptionOSType struct {
 //	    </libosinfo:libosinfo>
 //	</metadata>
 type XMLDomainDescriptionMetadata struct {
-	XMLName   xml.Name                              `xml:"metadata"`
-	LibOsInfo XMLDomainDescriptionMetadataLibOsInfo `xml:"libosinfo"`
+	XMLName   xml.Name                               `xml:"metadata"`
+	LibOsInfo *XMLDomainDescriptionMetadataLibOsInfo `xml:"libosinfo"`
 }
 
 type XMLDomainDescriptionMetadataLibOsInfo struct {
-	XMLName xml.Name                                `xml:"libosinfo"`
-	Os      XMLDomainDescriptionMetadataLibOsInfoOs `xml:"os"`
+	XMLName xml.Name                                 `xml:"libosinfo"`
+	Os      *XMLDomainDescriptionMetadataLibOsInfoOs `xml:"os"`
 }
 
 type XMLDomainDescriptionMetadataLibOsInfoOs struct {
@@ -147,22 +285,28 @@ type XMLDomainDescriptionMetadataLibOsInfoOs struct {
 //	    <alias name="virtio-disk0"/>
 //	    <address bus="0x04" domain="0x0000" function="0x0" slot="0x00" type="pci"/>
 //	</disk>
+
 type XMLDomainDescriptionDevices struct {
 	XMLName xml.Name `xml:"devices"`
 	// no xml name because it is a list
 	Emulator   string                                 `xml:"emulator"`
 	Disks      []XMLDomainDescriptionDevicesDisk      `xml:"disk"`
 	Interfaces []XMLDomainDescriptionDevicesInterface `xml:"interface"`
+	Serial     []XMLDomainDescriptionDevicesSerial    `xml:"serial,omitempty"`
+	Console    []XMLDomainDescriptionDevicesConsole   `xml:"console,omitempty"`
 }
 
+// XMLDomainDescriptionDevicesDisk
+// TODO check the target, alias and address of the disk
 type XMLDomainDescriptionDevicesDisk struct {
-	XMLName      xml.Name                                    `xml:"disk"`
-	Driver       XMLDomainDescriptionDevicesDiskDriver       `xml:"driver"`
-	Device       string                                      `xml:"device,attr"`
-	Type         string                                      `xml:"type,attr"`
-	Source       XMLDomainDescriptionDevicesDiskSource       `xml:"source"`
-	BackingStore XMLDomainDescriptionDevicesDiskBackingStore `xml:"backingStore"`
-	Target       XMLDomainDescriptionDevicesDiskTarget       `xml:"target"`
+	XMLName      xml.Name                                     `xml:"disk"`
+	Driver       *XMLDomainDescriptionDevicesDiskDriver       `xml:"driver"`
+	Device       string                                       `xml:"device,attr"`
+	Type         string                                       `xml:"type,attr"`
+	Source       *XMLDomainDescriptionDevicesDiskSource       `xml:"source"`
+	BackingStore *XMLDomainDescriptionDevicesDiskBackingStore `xml:"backingStore"`
+	Target       *XMLDomainDescriptionDevicesDiskTarget       `xml:"target"`
+	Address      *XMLDomainDescriptionDevicesDiskAddress      `xml:"address,omitempty"`
 }
 
 type XMLDomainDescriptionDevicesDiskDriver struct {
@@ -177,10 +321,10 @@ type XMLDomainDescriptionDevicesDiskSource struct {
 }
 
 type XMLDomainDescriptionDevicesDiskBackingStore struct {
-	XMLName xml.Name                                          `xml:"backingStore"`
-	Type    string                                            `xml:"type,attr"`
-	Format  XMLDomainDescriptionDevicesDiskBackingStoreFormat `xml:"format"`
-	Source  XMLDomainDescriptionDevicesDiskBackingStoreSource `xml:"source"`
+	XMLName xml.Name                                           `xml:"backingStore"`
+	Type    string                                             `xml:"type,attr"`
+	Format  *XMLDomainDescriptionDevicesDiskBackingStoreFormat `xml:"format"`
+	Source  *XMLDomainDescriptionDevicesDiskBackingStoreSource `xml:"source"`
 }
 
 type XMLDomainDescriptionDevicesDiskBackingStoreFormat struct {
@@ -199,6 +343,16 @@ type XMLDomainDescriptionDevicesDiskTarget struct {
 	Device  string   `xml:"dev,attr"`
 }
 
+// XMLDomainDescriptionDevicesDiskAddress not mandatory
+type XMLDomainDescriptionDevicesDiskAddress struct {
+	XMLName    xml.Name `xml:"address"`
+	Type       string   `xml:"type,attr"`
+	Controller string   `xml:"controller,attr"`
+	Bus        string   `xml:"bus,attr"`
+	Target     string   `xml:"target,attr"`
+	Unit       string   `xml:"unit,attr"`
+}
+
 // XMLDomainDescriptionDevicesInterface
 //
 //	<interface type="network">
@@ -210,12 +364,12 @@ type XMLDomainDescriptionDevicesDiskTarget struct {
 //	    <address bus="0x01" domain="0x0000" function="0x0" slot="0x00" type="pci"/>
 //	</interface>
 type XMLDomainDescriptionDevicesInterface struct {
-	XMLName xml.Name                                   `xml:"interface"`
-	Type    string                                     `xml:"type,attr"`
-	Mac     XMLDomainDescriptionDevicesInterfaceMac    `xml:"mac"`
-	Source  XMLDomainDescriptionDevicesInterfaceSource `xml:"source"`
-	Target  XMLDomainDescriptionDevicesInterfaceTarget `xml:"target"`
-	Model   XMLDomainDescriptionDevicesInterfaceModel  `xml:"model"`
+	XMLName xml.Name                                    `xml:"interface"`
+	Type    string                                      `xml:"type,attr"`
+	Mac     *XMLDomainDescriptionDevicesInterfaceMac    `xml:"mac"`
+	Source  *XMLDomainDescriptionDevicesInterfaceSource `xml:"source"`
+	Target  *XMLDomainDescriptionDevicesInterfaceTarget `xml:"target"`
+	Model   *XMLDomainDescriptionDevicesInterfaceModel  `xml:"model"`
 }
 
 type XMLDomainDescriptionDevicesInterfaceMac struct {
@@ -237,6 +391,48 @@ type XMLDomainDescriptionDevicesInterfaceTarget struct {
 type XMLDomainDescriptionDevicesInterfaceModel struct {
 	XMLName xml.Name `xml:"model"`
 	Type    string   `xml:"type,attr"`
+}
+
+// XMLDomainDescriptionDevicesSerial
+//
+//	<serial type='pty'>
+//	  <target type='isa-serial' port='0'>
+//	    <model name='isa-serial'/>
+//	  </target>
+//	</serial>
+type XMLDomainDescriptionDevicesSerial struct {
+	XMLName xml.Name                                 `xml:"serial"`
+	Type    string                                   `xml:"type,attr"`
+	Target  *XMLDomainDescriptionDevicesSerialTarget `xml:"target"`
+}
+
+type XMLDomainDescriptionDevicesSerialTarget struct {
+	XMLName xml.Name                                      `xml:"target"`
+	Type    string                                        `xml:"type,attr"`
+	Port    string                                        `xml:"port,attr,omitempty"`
+	Model   *XMLDomainDescriptionDevicesSerialTargetModel `xml:"model"`
+}
+
+type XMLDomainDescriptionDevicesSerialTargetModel struct {
+	XMLName xml.Name `xml:"model"`
+	Name    string   `xml:"name,attr"`
+}
+
+// XMLDomainDescriptionDevicesConsole
+//
+//	<console type='pty'>
+//	  <target type='serial' port='0'/>
+//	</console>
+type XMLDomainDescriptionDevicesConsole struct {
+	XMLName xml.Name                                  `xml:"console"`
+	Type    string                                    `xml:"type,attr"`
+	Target  *XMLDomainDescriptionDevicesConsoleTarget `xml:"target"`
+}
+
+type XMLDomainDescriptionDevicesConsoleTarget struct {
+	XMLName xml.Name `xml:"target"`
+	Type    string   `xml:"type,attr"`
+	Port    string   `xml:"port,attr,omitempty"`
 }
 
 // XMLNetworkDescription example
@@ -274,13 +470,13 @@ type XMLDomainDescriptionDevicesInterfaceModel struct {
 //
 // </network>
 type XMLNetworkDescription struct {
-	XMLName xml.Name                     `xml:"network"`
-	Name    string                       `xml:"name"`
-	UUID    string                       `xml:"uuid"`
-	Forward XMLNetworkDescriptionForward `xml:"forward"`
-	Bridge  XMLNetworkDescriptionBridge  `xml:"bridge"`
-	Mac     XMLNetworkDescriptionMac     `xml:"mac"`
-	Ip      XMLNetworkDescriptionIp      `xml:"ip"`
+	XMLName xml.Name                      `xml:"network"`
+	Name    string                        `xml:"name"`
+	UUID    string                        `xml:"uuid"`
+	Forward *XMLNetworkDescriptionForward `xml:"forward"`
+	Bridge  *XMLNetworkDescriptionBridge  `xml:"bridge"`
+	Mac     *XMLNetworkDescriptionMac     `xml:"mac"`
+	Ip      *XMLNetworkDescriptionIp      `xml:"ip"`
 }
 
 type XMLNetworkDescriptionForward struct {
@@ -299,14 +495,14 @@ type XMLNetworkDescriptionMac struct {
 }
 
 type XMLNetworkDescriptionIp struct {
-	XMLName xml.Name                    `xml:"ip"`
-	Address string                      `xml:"address,attr"`
-	Dhcp    XMLNetworkDescriptionIpDhcp `xml:"dhcp"`
+	XMLName xml.Name                     `xml:"ip"`
+	Address string                       `xml:"address,attr"`
+	Dhcp    *XMLNetworkDescriptionIpDhcp `xml:"dhcp"`
 }
 
 type XMLNetworkDescriptionIpDhcp struct {
-	XMLName xml.Name                         `xml:"dhcp"`
-	Range   XMLNetworkDescriptionIpDhcpRange `xml:"range"`
+	XMLName xml.Name                          `xml:"dhcp"`
+	Range   *XMLNetworkDescriptionIpDhcpRange `xml:"range"`
 }
 
 type XMLNetworkDescriptionIpDhcpRange struct {
@@ -463,6 +659,8 @@ type CloudInitUserData struct {
 	RunCmd         []string                     `yaml:"runcmd,omitempty"`      // default: empty
 	PowerState     *CloudInitUserDataPowerState `yaml:"power_state,omitempty"` // default: nil
 }
+
+const CloudInitUserDataHeader string = "#cloud-config\n"
 
 const CloudInitUserDataOutputAllString = ">> /var/log/cloud-init.log"
 

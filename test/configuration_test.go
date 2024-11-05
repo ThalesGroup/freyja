@@ -45,6 +45,8 @@ const ExpectedHelloFileContent string = "hello"
 // ExpectedWorldContent inject some content in temp file for unit tests
 const ExpectedWorldFileContent string = "world"
 
+const FreyjaUnitTestConfigDir string = FreyjaUnitTestDir + "/config"
+
 func BuildCompleteConfig() *internal.ConfigurationData {
 	parentDir := "config"
 	// mandatory files for the test
@@ -434,7 +436,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 		t.Fail()
 	}
 	// user ssh keys
-	u1ExpectedKeys := []string{"/tmp/freyja-unit-test/config/sam.pub", "/tmp/freyja-unit-test/config/ext.pub"}
+	u1ExpectedKeys := []string{FreyjaUnitTestConfigDir + "/sam.pub", FreyjaUnitTestConfigDir + "/ext.pub"}
 	if !compareOrderedStringSlices(u1ExpectedKeys, u1.Keys) {
 		t.Logf("expected user keys '%v' but got '%v'", u1ExpectedKeys, u1.Keys)
 		t.Fail()
@@ -481,7 +483,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 		t.Fail()
 	}
 	f1 := m1.Files[0]
-	if f1.Source != "/tmp/freyja-unit-test/config/hello.txt" {
+	if f1.Source != FreyjaUnitTestConfigDir+"/hello.txt" {
 		t.Logf("expected file source '/tmp/freyja-unit-test/config/hello.txt' but got '%s'", f1.Source)
 		t.Fail()
 	}
@@ -498,7 +500,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 		t.Fail()
 	}
 	f2 := m1.Files[1]
-	if f2.Source != "/tmp/freyja-unit-test/config/world.txt" {
+	if f2.Source != FreyjaUnitTestConfigDir+"/world.txt" {
 		t.Logf("expected file source '/tmp/freyja-unit-test/config/world.txt' but got '%s'", f2.Source)
 		t.Fail()
 	}

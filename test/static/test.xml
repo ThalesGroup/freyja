@@ -1,0 +1,30 @@
+<domain type='kvm'>
+    <name>xenial</name>
+    <memory>1048576</memory>
+    <os>
+        <type>hvm</type>
+        <boot dev="hd" />
+    </os>
+    <features>
+        <acpi/>
+    </features>
+    <vcpu>1</vcpu>
+    <devices>
+        <interface type='bridge'>
+            <source bridge='virbr0'/>
+            <model type='virtio'/>
+        </interface>
+        <disk type='file' device='disk'>
+            <driver type='qcow2' cache='none'/>
+            <source file='/home/kaio/.freyja/machines/vm1/vm1-root-image.qcow2'/>
+            <target dev='vda' bus='virtio'/>
+        </disk>
+        <disk type='file' device='disk'>
+            <source file='/home/kaio/.freyja/machines/vm1/vm1-cloud-init.iso'/>
+            <target dev='vdb' bus='virtio'/>
+        </disk>
+        <console type="pty">
+            <target type="serial" port="1"/>
+        </console>
+    </devices>
+</domain>

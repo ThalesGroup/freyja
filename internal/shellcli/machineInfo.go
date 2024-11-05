@@ -119,8 +119,8 @@ func getDomainShortDescription(domain libvirt.Domain, description *internal.XMLD
 				Logger.Error("Cannot get domain disk information", "domain", domain.Name)
 				return nil, err
 			}
-			humanCapacity := fmt.Sprintf("%.3f GB", internal.BytesToGB(capacity))
-			humanAllocation := fmt.Sprintf("%.3f GB", internal.BytesToGB(allocation))
+			humanCapacity := fmt.Sprintf("%.3f GB", internal.BytesToGiB(capacity))
+			humanAllocation := fmt.Sprintf("%.3f GB", internal.BytesToGiB(allocation))
 			d := &shortDisk{
 				Device:     diskData.Target.Device,
 				Capacity:   humanCapacity,
@@ -131,7 +131,7 @@ func getDomainShortDescription(domain libvirt.Domain, description *internal.XMLD
 
 	}
 
-	humanMemory := fmt.Sprintf("%.3f GB", internal.KibToGB(description.Memory))
+	humanMemory := fmt.Sprintf("%.3f GB", internal.KibToGiB(description.Memory.Value))
 	return &shortDescription{
 		Hostname:     description.Name,
 		OSInfo:       description.Metadata.LibOsInfo.Os.ID,

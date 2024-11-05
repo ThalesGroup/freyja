@@ -9,8 +9,6 @@ import (
 	"strings"
 )
 
-const networkTemplatePath string = "templates/network.xml.tmpl"
-
 type NetworkData struct {
 	Name      string
 	UUID      string
@@ -72,6 +70,11 @@ func init() {
 	}
 }
 
+// NetworkCreateConfig
+// TODO :
+//
+//	to create a network with existing routed interfaces on host :
+//	https://libvirt.org/formatnetwork.html#routed-network-config
 func NetworkCreateConfig(networkName string) internal.XMLNetworkDescription {
 	configForward := internal.XMLNetworkDescriptionForward{
 		Mode: "bridge",
@@ -82,7 +85,7 @@ func NetworkCreateConfig(networkName string) internal.XMLNetworkDescription {
 	return internal.XMLNetworkDescription{
 		Name:    networkName,
 		UUID:    internal.GenerateUUID(),
-		Forward: configForward,
-		Bridge:  configBridge,
+		Forward: &configForward,
+		Bridge:  &configBridge,
 	}
 }

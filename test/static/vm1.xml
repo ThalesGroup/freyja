@@ -9,6 +9,9 @@
         <type arch="x86_64">hvm</type>
         <boot dev="hd" />
     </os>
+    <on_poweroff>destroy</on_poweroff>
+    <on_reboot>restart</on_reboot>
+    <on_crash>destroy</on_crash>
     <devices>
         <emulator>/usr/bin/qemu-system-x86_64</emulator>
         <disk device="disk" type="file">

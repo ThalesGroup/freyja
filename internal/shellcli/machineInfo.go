@@ -11,22 +11,24 @@ import (
 	"os"
 )
 
-type shortDescription struct {
-	Hostname     string            `yaml:"hostname"`
-	OSInfo       string            `yaml:"osInfo"`
-	Architecture string            `yaml:"architecture"`
-	Memory       string            `yaml:"memory"` // "<amount> MB"
-	Vcpu         uint              `yaml:"vcpu"`
-	Interfaces   []shortInterfaces `yaml:"interfaces"`
-	Disks        []shortDisk
+type machineDescription struct {
+	Hostname     string             `yaml:"hostname"`
+	OSInfo       string             `yaml:"osInfo"`
+	Architecture string             `yaml:"architecture"`
+	Memory       string             `yaml:"memory"` // "<amount> MB"
+	Vcpu         uint               `yaml:"vcpu"`
+	Interfaces   []machineInterface `yaml:"interfaces"`
+	Disks        []machineDisk
 }
 
-type shortInterfaces struct {
-	TargetDevice string                  `yaml:"targetDevice"`
-	Network      shortNetworkDescription `yaml:"network"`
+type machineInterface struct {
+	HostInterface string `yaml:"hostInterface"`
+	Network       string `yaml:"network"`
+	Mac           string `yaml:"mac"`
+	IP            string `yaml:"ip"`
 }
 
-type shortDisk struct {
+type machineDisk struct {
 	Device     string `yaml:"device"`
 	Capacity   string `yaml:"capacity"`   // "<amount> GB"
 	Allocation string `yaml:"allocation"` // "<amount> GB"
@@ -94,23 +96,49 @@ func getDomainXMLDescription(domain libvirt.Domain) (*internal.XMLDomainDescript
 	return &description, err
 }
 
-func getDomainShortDescription(domain libvirt.Domain, description *internal.XMLDomainDescription) (*shortDescription, error) {
+func getDomainMacIP(domain libvirt.Domain, targetHostInterface string) (mac string, ip string, err error) {
+	// get ip from domain
+	// could also use ARP : domIntAddr, err := LibvirtConnexion.DomainInterfaceAddresses(domain, uint32(libvirt.DomainInterfaceAddressesSrcArp), 0)
+	domIntAddrs, err := LibvirtConnexion.DomainInterfaceAddresses(domain, uint32(libvirt.DomainInterfaceAddressesSrcLease), 0)
+	if err != nil {
+		return "", "", fmt.Errorf("cannot find '%s' domain interface from device '%s': %w", domain.Name, targetHostInterface, err)
+	}
+	for _, inter := range domIntAddrs {
+		if inter.Name == targetHostInterface {
+			// TODO investigate in case of multiple interfaces per device
+			mac = inter.Hwaddr[0]
+			ip = inter.Addrs[0].Addr
+		}
+	}
+
+	// handle empty ip
+	if ip == "" {
+		ip = "inactive"
+	}
+
+	return
+}
+
+func getDomainShortDescription(domain libvirt.Domain, description *internal.XMLDomainDescription) (*machineDescription, error) {
 	// get networks info from xml struct
-	var interfaces []shortInterfaces
+	var interfaces []machineInterface
 	for _, ifaceData := range description.Devices.Interfaces {
-		networkInfo, err := getNetworkShortDescription(ifaceData.Source.Network)
+		hostInterface := ifaceData.Target.Device
+		mac, ip, err := getDomainMacIP(domain, hostInterface)
 		if err != nil {
-			Logger.Error("Cannot get domain network information", "domain", domain.Name, "network", ifaceData.Source.Network)
+			Logger.Error("Cannot get domain network information", "domain", domain.Name)
 			return nil, err
 		}
-		iface := &shortInterfaces{
-			TargetDevice: ifaceData.Target.Device,
-			Network:      *networkInfo,
+		iface := &machineInterface{
+			HostInterface: hostInterface,
+			Network:       ifaceData.Source.Network,
+			Mac:           mac,
+			IP:            ip,
 		}
 		interfaces = append(interfaces, *iface)
 	}
 	// get disks info from xml struct
-	var disks []shortDisk
+	var disks []machineDisk
 	for _, diskData := range description.Devices.Disks {
 		// get each disk info for domain
 		if diskData.Device == "disk" {
@@ -121,7 +149,7 @@ func getDomainShortDescription(domain libvirt.Domain, description *internal.XMLD
 			}
 			humanCapacity := fmt.Sprintf("%.3f GB", internal.BytesToGiB(capacity))
 			humanAllocation := fmt.Sprintf("%.3f GB", internal.BytesToGiB(allocation))
-			d := &shortDisk{
+			d := &machineDisk{
 				Device:     diskData.Target.Device,
 				Capacity:   humanCapacity,
 				Allocation: humanAllocation,
@@ -131,13 +159,24 @@ func getDomainShortDescription(domain libvirt.Domain, description *internal.XMLD
 
 	}
 
+	// os info
+	var osInfo string
+	if description.Metadata == nil {
+		osInfo = "generic"
+	} else {
+		osInfo = description.Metadata.LibOsInfo.Os.ID
+	}
+
+	// memory
 	humanMemory := fmt.Sprintf("%.3f GB", internal.KibToGiB(description.Memory.Value))
-	return &shortDescription{
+
+	// summary
+	return &machineDescription{
 		Hostname:     description.Name,
-		OSInfo:       description.Metadata.LibOsInfo.Os.ID,
+		OSInfo:       osInfo,
 		Architecture: description.OS.Type.Arch,
 		Memory:       humanMemory,
-		Vcpu:         description.Vcpu,
+		Vcpu:         uint(description.Vcpu.Value),
 		Interfaces:   interfaces,
 		Disks:        disks,
 	}, nil

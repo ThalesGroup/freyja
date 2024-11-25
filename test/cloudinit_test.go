@@ -3,11 +3,10 @@ package internal
 import (
 	"bytes"
 	"embed"
-	"fmt"
+	"errors"
 	"freyja/internal"
 	"os"
 	"path/filepath"
-	"slices"
 	"testing"
 )
 
@@ -16,96 +15,22 @@ import (
 //go:embed static/*
 var testFilesCloudInitDir embed.FS
 
-// testFileEmptyConfiguration is used to test empty configuration (missing required values)
 const testFileCloudInitDefaultMetadata string = "static/cloudinit_default_metadata.yaml"
 
-// testFileEmptyConfiguration is used to test empty configuration (missing required values)
 const testFileCloudInitDefaultUserData string = "static/cloudinit_default_user_data.yaml"
 
-const testFileCloudInitCompleteUserData string = "static/cloudinit_complete_user_data.yaml"
+const testFileCloudInitCompleteMetadataVm1 string = "static/cloudinit_complete_metadata_vm1.yaml"
+
+const testFileCloudInitCompleteMetadataVm2 string = "static/cloudinit_complete_metadata_vm2.yaml"
+
+const testFileCloudInitCompleteUserDataVm1 string = "static/cloudinit_complete_user_data_vm1.yaml"
+
+const testFileCloudInitCompleteUserDataVm2 string = "static/cloudinit_complete_user_data_vm2.yaml"
 
 const cloudInitTestDirname = "cloudinit"
 
 //
-// UTILS
-//
-
-func getCloudInitTestDirPath() string {
-	return filepath.Join(FreyjaUnitTestDir, cloudInitTestDirname)
-}
-
-// testWriteCloudConfig compares two cloud init files (user data or metadata) : an expected one
-// with a generated one from a machine config data model
-func writeAndCompareCloudInitConfig(t *testing.T, expectedFilePath string, testedFilename string, cloudInitType internal.CloudInitConfiguration, machineConfig *internal.ConfigurationMachine) {
-	expectedContent, err := os.ReadFile(expectedFilePath)
-	if err != nil {
-		t.Errorf("could not read unit test file '%s', reason: %v", expectedFilePath, err)
-		t.FailNow()
-	}
-
-	// test for second machine
-	// get only the minimum required for machine config
-	if err := cloudInitType.Build(machineConfig); err != nil {
-		t.Errorf("Could not build cloud init configuration from complete config: %v", err)
-		t.FailNow()
-	}
-
-	if err := cloudInitType.Write(getCloudInitTestDirPath()); err != nil {
-		t.Errorf("could not write cloud init config in '%s', reason: %v", getCloudInitTestDirPath(), err)
-		t.FailNow()
-	}
-
-	path := filepath.Join(getCloudInitTestDirPath(), testedFilename)
-	testContent, err := os.ReadFile(path)
-	if err != nil {
-		t.Errorf("could not read cloud init file '%s', reason: %v", path, err)
-		t.FailNow()
-	}
-
-	if !bytes.Equal(expectedContent, testContent) {
-		t.Errorf("wrong content, expected '%s' but got '%s'", string(expectedContent), string(testContent))
-		t.FailNow()
-	}
-}
-
-// TestGenerateCloudInitConfigs just verify that the configs are properly built and written
-// all the other specs are already tested in the other tests
-func TestGenerateCloudInitConfigs(t *testing.T) {
-	// build user config
-	c := BuildCompleteConfig()
-	// should have 2 machine config
-	testDir := filepath.Join(getCloudInitTestDirPath(), "TestGenerateCloudInitConfigs")
-	for _, machine := range c.Machines {
-		if err := internal.GenerateCloudInitConfigs(&machine, testDir); err != nil {
-			t.Errorf("cannot generate cloud init configs for machine '%s', reason: %v", machine.Hostname, err)
-			t.FailNow()
-		}
-		// test filenames and number or files
-		entries, err := os.ReadDir(testDir)
-		if err != nil {
-			t.Errorf("cannot read cloud init configs in test dir '%s', reason: %v", getCloudInitTestDirPath(), err)
-			t.FailNow()
-		}
-
-		// parse the entries to string and compare
-		files := make([]string, len(entries))
-		for _, e := range entries {
-			files = append(files, e.Name())
-		}
-		// test that the files have been generated
-		if !slices.Contains(files, internal.GetCloudInitMetadataFilename(machine.Hostname)) {
-			t.Errorf("expected cloud init metadata file not found for machine '%s'", machine.Hostname)
-			t.Fail()
-		}
-		if !slices.Contains(files, internal.GetCloudInitUserDataFilename(machine.Hostname)) {
-			t.Errorf("expected cloud init user data file not found for machine '%s'", machine.Hostname)
-			t.Fail()
-		}
-	}
-}
-
-//
-// METADATA
+// METADATA MODEL
 //
 
 // TestBuildMetadataCloudInitConfig test if the built cloud init metadata model, from a machine
@@ -116,7 +41,10 @@ func TestBuildMetadataCloudInitConfig(t *testing.T) {
 	// test for second machine
 	// get only the minimum required for machine config
 	m := &c.Machines[1]
-	ci.Build(m)
+	if err := ci.Build(m); err != nil {
+		t.Errorf("error while building the configuration of machine '%s': '%v", m.Hostname, err)
+		t.FailNow()
+	}
 	if ci.LocalHostname != m.Hostname {
 		t.Errorf("Expected local hostname '%s' but got '%s'", m.Hostname, ci.LocalHostname)
 		t.FailNow()
@@ -128,17 +56,8 @@ func TestBuildMetadataCloudInitConfig(t *testing.T) {
 	}
 }
 
-// TestWriteMetadataCloudInitConfig test if the written cloud init metadata file is valid
-func TestWriteMetadataCloudInitConfig(t *testing.T) {
-	c := BuildCompleteConfig()
-	m := &c.Machines[1]
-	testedFilename := fmt.Sprintf("%s%s", m.Hostname, internal.CloudInitMetadataFileSuffix)
-	var ci internal.CloudInitMetadata
-	writeAndCompareCloudInitConfig(t, testFileCloudInitDefaultMetadata, testedFilename, &ci, m)
-}
-
 //
-// USER DATA
+// USER DATA MODEL
 //
 
 // TestBuildUserDataCloudInitDefaultConfig checks the cloud init user data model for values
@@ -353,20 +272,101 @@ func TestBuildUserDataCloudInitCompleteConfig(t *testing.T) {
 
 }
 
-// TestWriteMetadataCloudInitConfig test if the written cloud init user data file is valid
-func TestWriteUserDataCloudInitDefaultConfig(t *testing.T) {
-	c := BuildDefaultConfig()
-	m := &c.Machines[0]
-	testedFilename := fmt.Sprintf("%s%s", m.Hostname, internal.CloudInitUserDataFileSuffix)
-	var ci internal.CloudInitUserData
-	writeAndCompareCloudInitConfig(t, testFileCloudInitDefaultUserData, testedFilename, &ci, m)
+//
+// CONFIG GENERATION (WRITING)
+//
+
+type expectedFilesPath struct {
+	expectedMetadata, expectedUserdata string
 }
 
-// TestWriteUserDataCloudInitCompleteConfig test if the written cloud init user data file is valid
-func TestWriteUserDataCloudInitCompleteConfig(t *testing.T) {
-	c := BuildCompleteConfig()
-	m := &c.Machines[0]
-	testedFilename := fmt.Sprintf("%s%s", m.Hostname, internal.CloudInitUserDataFileSuffix)
-	var ci internal.CloudInitUserData
-	writeAndCompareCloudInitConfig(t, testFileCloudInitCompleteUserData, testedFilename, &ci, m)
+func getCloudInitTestDirPath() string {
+	return filepath.Join(FreyjaUnitTestDir, cloudInitTestDirname)
+}
+
+// TestGenerateCloudInitConfigs verifies that the configs are properly built and written
+// all the other specs are already tested in the other tests
+func TestGenerateCloudInitConfigs(t *testing.T) {
+
+	// default and minimal config
+	expectedDefaultFiles := make(map[string]expectedFilesPath)
+	expectedDefaultFiles["vm1"] = expectedFilesPath{
+		expectedMetadata: testFileCloudInitDefaultMetadata,
+		expectedUserdata: testFileCloudInitDefaultUserData,
+	}
+	c := BuildDefaultConfig()
+	testGeneratedDefaultCloudInitConfigs(t, "TestGenerateDefaultCloudInitConfigs", c, expectedDefaultFiles)
+
+	// complete configuration
+	expectedCompleteFiles := make(map[string]expectedFilesPath)
+	expectedCompleteFiles["vm1"] = expectedFilesPath{
+		expectedMetadata: testFileCloudInitCompleteMetadataVm1,
+		expectedUserdata: testFileCloudInitCompleteUserDataVm1,
+	}
+	expectedCompleteFiles["vm2"] = expectedFilesPath{
+		expectedMetadata: testFileCloudInitCompleteMetadataVm2,
+		expectedUserdata: testFileCloudInitCompleteUserDataVm2,
+	}
+	c = BuildCompleteConfig()
+	testGeneratedDefaultCloudInitConfigs(t, "TestGenerateCompleteCloudInitConfigs", c, expectedCompleteFiles)
+}
+
+// testGeneratedDefaultCloudInitConfigs test the generated cloud init files
+// To test the content, this method takes the first machine config only
+func testGeneratedDefaultCloudInitConfigs(t *testing.T, testDirName string, config *internal.ConfigurationData, expected map[string]expectedFilesPath) {
+	var err error
+	for _, machine := range config.Machines {
+		testDir := filepath.Join(getCloudInitTestDirPath(), testDirName, machine.Hostname)
+		if err = internal.GenerateCloudInitConfigs(&machine, testDir); err != nil {
+			t.Errorf("cannot generate cloud init configs for machine '%s', reason: %v", machine.Hostname, err)
+			t.FailNow()
+		}
+
+		// test if files have been created
+		resultMetadataFilePath := filepath.Join(testDir, internal.CloudInitMetadataFileName)
+		resultUserdataFilePath := filepath.Join(testDir, internal.CloudInitUserDataFileName)
+		if _, err = os.Stat(resultMetadataFilePath); errors.Is(err, os.ErrNotExist) {
+			t.Errorf("cloud init metadata file not found in '%s'", testDir)
+			t.FailNow()
+		}
+		if _, err = os.Stat(resultUserdataFilePath); errors.Is(err, os.ErrNotExist) {
+			t.Errorf("cloud init user data file not found in '%s'", testDir)
+			t.FailNow()
+		}
+
+		// test files content
+		// metadata
+		var expectedMetadataRaw []byte
+		expectedMetadataFilePath := expected[machine.Hostname].expectedMetadata
+		if expectedMetadataRaw, err = os.ReadFile(expectedMetadataFilePath); err != nil {
+			t.Errorf("cannot read expected matadata file for comparison in '%s': %v", expectedMetadataFilePath, err)
+			t.FailNow()
+		}
+		var resultMetadataRaw []byte
+		if resultMetadataRaw, err = os.ReadFile(resultMetadataFilePath); err != nil {
+			t.Errorf("cannot read result matadata file for comparison in '%s': %v", resultMetadataFilePath, err)
+			t.FailNow()
+		}
+		if !bytes.Equal(expectedMetadataRaw, resultMetadataRaw) {
+			t.Errorf("expected and result metadata content do not match for '%s'", resultMetadataFilePath)
+			t.Fail()
+		}
+		// user data
+		var expectedUserdataRaw []byte
+		expectedUserdataFilePath := expected[machine.Hostname].expectedUserdata
+		if expectedUserdataRaw, err = os.ReadFile(expectedUserdataFilePath); err != nil {
+			t.Errorf("cannot read expected matadata file for comparison in '%s': %v", expectedUserdataFilePath, err)
+			t.FailNow()
+		}
+		var resultUserdataRaw []byte
+		if resultUserdataRaw, err = os.ReadFile(resultUserdataFilePath); err != nil {
+			t.Errorf("cannot read result matadata file for comparison in '%s': %v", resultUserdataFilePath, err)
+			t.FailNow()
+		}
+		if !bytes.Equal(expectedUserdataRaw, resultUserdataRaw) {
+			t.Errorf("expected and result user data content do not match for '%s'", resultUserdataFilePath)
+			t.Fail()
+		}
+	}
+
 }

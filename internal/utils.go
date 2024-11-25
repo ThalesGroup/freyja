@@ -8,35 +8,7 @@ import (
 	"os"
 )
 
-func GenerateUUID() string {
-	return uuid.New().String()
-}
-
-func CheckIfFileExists(path string) error {
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	return nil
-}
-
-// KibToGiB
-// byte to kb = float(n)/(1<<10)
-// byte to mb = float(n)/(1<<20)
-// byte to gb = float(n)/(1<<30)
-// 1<<10 = 2^10. = 1024
-// 1<<20 = 2^20 = 1024*1024
-// ...
-func KibToGiB(kib uint64) float64 {
-	return float64(kib) / (1 << 20)
-}
-
-func MiBToKiB(GiB uint64) float64 {
-	return float64(GiB) * (1 << 10)
-}
-
-func BytesToGiB(by uint64) float64 {
-	return float64(by) / (1 << 30)
-}
+// Prompt
 
 // AskUserYesNoConfirmation returns true if user confirmed 'yes', false otherwise.
 func AskUserYesNoConfirmation() (bool, error) {
@@ -64,8 +36,61 @@ func AskUserYesNoConfirmation() (bool, error) {
 
 }
 
+// ID
+
+func GenerateUUID() string {
+	return uuid.New().String()
+}
+
+// Conversion
+
+// KibToGiB
+// byte to kb = float(n)/(1<<10)
+// byte to mb = float(n)/(1<<20)
+// byte to gb = float(n)/(1<<30)
+// 1<<10 = 2^10. = 1024
+// 1<<20 = 2^20 = 1024*1024
+// ...
+func KibToGiB(kib uint64) float64 {
+	return float64(kib) / (1 << 20)
+}
+
+func MiBToKiB(GiB uint64) float64 {
+	return float64(GiB) * (1 << 10)
+}
+
+func BytesToGiB(by uint64) float64 {
+	return float64(by) / (1 << 30)
+}
+
+// Encoding
+
 func EncodeB64Bytes(b []byte) string {
 	return b64.StdEncoding.EncodeToString(b)
+}
+
+// Files
+
+func FileExists(path string) bool {
+	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
+		return false
+	}
+	return true
+}
+
+// RemoveIfExists removes a file if it exists.
+// Return true if the file was actually removed.
+// Return false if no file existed within the given path/
+// Return an error if the deletion failed.
+func RemoveIfExists(path string) (deleted bool, err error) {
+	if FileExists(path) {
+		if err = os.Remove(path); err != nil {
+			return false, fmt.Errorf("couldn't remove '%s': %w", path, err)
+		}
+		return true, nil
+	}
+	Logger.Debug("not removed : doesn't exist", "path", path)
+	return false, nil
 }
 
 func CopyFile(source string, destination string, destinationPermissions os.FileMode) error {

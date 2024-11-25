@@ -38,21 +38,6 @@ var machineDeleteCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
-			//// get storage pool for this domain
-			//pools, ret, err := LibvirtConnexion.ConnectListAllStoragePools(1, libvirt.ConnectListStoragePoolsInactive|libvirt.ConnectListStoragePoolsActive)
-			//if err != nil {
-			//	Logger.Error("Cannot lookup for storage pool with qemu connexion", "reason", err)
-			//	os.Exit(1)
-			//}
-			//if ret == 0 {
-			//	Logger.Warn("No storage pool found with qemu connexion")
-			//}
-			//var poolName string
-			//for _, pool := range pools {
-			//	if
-			//	pool.Name
-			//}
-
 			if err = LibvirtConnexion.DomainDestroyFlags(domain, libvirt.DomainDestroyDefault); err != nil {
 				Logger.Error("Cannot stop the domain", "domain", deleteDomainName, "reason", err)
 				os.Exit(1)
@@ -63,9 +48,8 @@ var machineDeleteCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
-			// TODO : delete storage pool
-			//LibvirtConnexion.StoragePoolDelete()
-			//LibvirtConnexion.StoragePoolDestroy()
+			// TODO if pool is still present, destroy and undefine it
+			// TODO finally delete the freyja folder for this machine
 
 		} else {
 			Logger.Info("Canceled")

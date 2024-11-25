@@ -1,0 +1,35 @@
+#cloud-config
+hostname: debian12-manual
+
+# Configure where output will go
+output:
+  all: ">> /var/log/cloud-init.log"
+
+users:
+  - name: "freyja"
+    sudo: [ 'ALL=(ALL) NOPASSWD:ALL' ]
+    lock_passwd: false
+    shell: /bin/bash
+    passwd: "$6$GM./aNJikL/g$AR2c35i1QIaimKo/zOC/1Qg2JO65ysPPjv/leWBcgBXaxNV3V8IcgJVeTzt4VHWzcja66zsBnR1iyYtO2DPme/"
+    groups: sudo
+    ssh_authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILISxfJd/91TY9DH97/Y6t2zejV8p0x7L4Ygjy45iMPp kaio@kaio-host      
+
+# Install my public ssh key to the first user configured
+# in cloud.cfg in the template (which is centos for CentOS cloud images)
+ssh_authorized_keys:
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILISxfJd/91TY9DH97/Y6t2zejV8p0x7L4Ygjy45iMPp kaio@kaio-host
+package_update: False
+package_upgrade: False
+
+packages:
+  - vim
+  - git
+
+
+# Remove cloud-init
+#runcmd:
+#  - systemctl stop network && systemctl start network
+
+final_message: "The system is finally up, after $UPTIME seconds"
+

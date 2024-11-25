@@ -134,5 +134,19 @@ Then run :
 
 ```sh
 sudo apt install cloud-init
-cloud-init schema -c myvm-cloudinit-userdata.yaml --annotate
+cloud-init schema -c ./user-data --annotate
+```
+
+## Manual debugging of machine files
+
+```sh
+freyja machine create -c myconfig.yaml --dry-run
+cd $HOME/.freyja/machines/mymachine
+# to regenerate cloud init config and iso image
+genisoimage -output mymachine-cloud-init.iso -volid cidata -rock user-data meta-data
+# define the machine in libvirt with the generated xml description
+virsh define mymachine-libvirt-conf.xml
+# start the domain in libvirt
+virsh start mymachine
+virsh list --all
 ```

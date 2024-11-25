@@ -94,8 +94,8 @@ func (cu *ConfigurationUser) validateUser() error {
 	if len(cu.Keys) > 0 {
 		for _, key := range cu.Keys {
 			// check if the key path's file exists
-			if err := CheckIfFileExists(key); err != nil {
-				return fmt.Errorf("user key file '%s' does not exists: %w", key, err)
+			if !FileExists(key) {
+				return fmt.Errorf("user key file '%s' does not exists", key)
 			}
 		}
 	}
@@ -104,7 +104,7 @@ func (cu *ConfigurationUser) validateUser() error {
 
 func (cf *ConfigurationFile) validateFiles() error {
 	// validate source
-	if err := CheckIfFileExists(cf.Source); err != nil {
+	if !FileExists(cf.Source) {
 		return errors.New(fmt.Sprintf("configuration not found : '%s' does not exist", cf.Source))
 	}
 	// validate permissions
@@ -175,6 +175,16 @@ func (c *ConfigurationData) setDefaultValues() {
 				Password: DefaultUserPassword,
 			}
 			machine.Users = users
+		} else {
+			for j, user := range machine.Users {
+				if user.Name == "" {
+					user.Name = DefaultUserName
+				}
+				if user.Password == "" {
+					user.Password = DefaultUserPassword
+				}
+				machine.Users[j] = user
+			}
 		}
 		// default storage
 		if machine.Storage == 0 {

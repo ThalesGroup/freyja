@@ -1,0 +1,31 @@
+<domain type="kvm">
+    <name>debian12-manual</name>
+    <uuid>8220de9b-b004-4339-b770-cf8e312c5cb2</uuid>
+    <memory unit="MiB">4096</memory>
+    <vcpu placement="static">1</vcpu>
+    <os>
+        <type arch='x86_64'>hvm</type>
+        <boot dev='hd'/>
+    </os>
+    <devices>
+        <emulator>/usr/bin/qemu-system-x86_64</emulator>
+        <disk type="file" device="disk">
+            <driver name="qemu" type="qcow2"/>
+            <source file="/home/kaio/Projects/thales/freyja/test/manual/debian-12-generic-amd64.qcow2"/>
+            <target dev="hda" bus="ide"/>
+        </disk>
+        <disk type="file" device="cdrom">
+            <driver name="qemu" type="raw"/>
+            <source file="/home/kaio/Projects/thales/freyja/test/manual/debian12-cloud-init.iso"/>
+            <target dev="hdb" bus="ide"/>
+            <readonly/>
+        </disk>
+        <interface type="network">
+            <mac address="52:54:00:17:49:b7"/>
+            <source network="default"/>
+        </interface>
+        <console type='pty'>
+            <target type='serial'/>
+        </console>
+    </devices>
+</domain>

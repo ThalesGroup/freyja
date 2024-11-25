@@ -1,30 +1,100 @@
-<domain type='kvm'>
-    <name>xenial</name>
-    <memory>1048576</memory>
+<domain type='kvm' id='14'>
+    <name>vm1</name>
+    <uuid>7b11e3d1-b4ef-77af-7e81-aa2aba7af47f</uuid>
+    <memory unit='KiB'>4194304</memory>
+    <currentMemory unit='KiB'>4194304</currentMemory>
+    <vcpu placement='static'>1</vcpu>
+    <resource>
+        <partition>/machine</partition>
+    </resource>
     <os>
-        <type>hvm</type>
-        <boot dev="hd" />
+        <type arch='x86_64' machine='pc-i440fx-7.2'>hvm</type>
+        <boot dev='hd'/>
     </os>
-    <features>
-        <acpi/>
-    </features>
-    <vcpu>1</vcpu>
+    <cpu mode='custom' match='exact' check='full'>
+        <model fallback='forbid'>qemu64</model>
+        <feature policy='require' name='x2apic'/>
+        <feature policy='require' name='hypervisor'/>
+        <feature policy='require' name='lahf_lm'/>
+        <feature policy='disable' name='svm'/>
+    </cpu>
+    <clock offset='utc'/>
+    <on_poweroff>destroy</on_poweroff>
+    <on_reboot>restart</on_reboot>
+    <on_crash>destroy</on_crash>
     <devices>
-        <interface type='bridge'>
-            <source bridge='virbr0'/>
-            <model type='virtio'/>
+        <emulator>/usr/bin/qemu-system-x86_64</emulator>
+        <disk type='file' device='disk'>
+            <driver name='qemu' type='qcow2'/>
+            <source file='/home/kaio/.freyja/machines/vm1/vm1-overlay-image.qcow2' index='2'/>
+            <backingStore type='file' index='3'>
+                <format type='qcow2'/>
+                <source file='/tmp/debian-12-generic-amd64.qcow2'/>
+                <backingStore/>
+            </backingStore>
+            <target dev='hda' bus='ide'/>
+            <alias name='ide0-0-0'/>
+            <address type='drive' controller='0' bus='0' target='0' unit='0'/>
+        </disk>
+
+        <disk type='file' device='cdrom'>
+            <driver name='qemu' type='raw'/>
+            <source file='/home/kaio/.freyja/machines/vm1/vm1-cloud-init.iso' index='1'/>
+            <backingStore/>
+            <target dev='hdb' bus='ide'/>
+            <readonly/>
+            <alias name='ide0-0-1'/>
+            <address type='drive' controller='0' bus='0' target='0' unit='1'/>
+        </disk>
+        <controller type='usb' index='0' model='piix3-uhci'>
+            <alias name='usb'/>
+            <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x2'/>
+        </controller>
+        <controller type='pci' index='0' model='pci-root'>
+            <alias name='pci.0'/>
+        </controller>
+        <controller type='ide' index='0'>
+            <alias name='ide'/>
+            <address type='pci' domain='0x0000' bus='0x00' slot='0x01' function='0x1'/>
+        </controller>
+        <interface type='network'>
+            <mac address='52:54:00:91:90:74'/>
+            <source network='default' portid='bc74b9e8-c96d-4d3a-9c7c-09c012d3f233' bridge='virbr0'/>
+            <target dev='vnet13'/>
+            <model type='e1000'/>
+            <alias name='net0'/>
+            <address type='pci' domain='0x0000' bus='0x00' slot='0x02' function='0x0'/>
         </interface>
-        <disk type='file' device='disk'>
-            <driver type='qcow2' cache='none'/>
-            <source file='/home/kaio/.freyja/machines/vm1/vm1-root-image.qcow2'/>
-            <target dev='vda' bus='virtio'/>
-        </disk>
-        <disk type='file' device='disk'>
-            <source file='/home/kaio/.freyja/machines/vm1/vm1-cloud-init.iso'/>
-            <target dev='vdb' bus='virtio'/>
-        </disk>
-        <console type="pty">
-            <target type="serial" port="1"/>
+        <serial type='pty'>
+            <source path='/dev/pts/2'/>
+            <target type='isa-serial' port='0'>
+                <model name='isa-serial'/>
+            </target>
+            <alias name='serial0'/>
+        </serial>
+        <console type='pty' tty='/dev/pts/2'>
+            <source path='/dev/pts/2'/>
+            <target type='serial' port='0'/>
+            <alias name='serial0'/>
         </console>
+        <input type='mouse' bus='ps2'>
+            <alias name='input0'/>
+        </input>
+        <input type='keyboard' bus='ps2'>
+            <alias name='input1'/>
+        </input>
+        <audio id='1' type='none'/>
+        <memballoon model='virtio'>
+            <alias name='balloon0'/>
+            <address type='pci' domain='0x0000' bus='0x00' slot='0x03' function='0x0'/>
+        </memballoon>
     </devices>
+    <seclabel type='dynamic' model='apparmor' relabel='yes'>
+        <label>libvirt-7b11e3d1-b4ef-77af-7e81-aa2aba7af47f</label>
+        <imagelabel>libvirt-7b11e3d1-b4ef-77af-7e81-aa2aba7af47f</imagelabel>
+    </seclabel>
+    <seclabel type='dynamic' model='dac' relabel='yes'>
+        <label>+1000:+1000</label>
+        <imagelabel>+1000:+1000</imagelabel>
+    </seclabel>
 </domain>

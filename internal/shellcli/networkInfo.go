@@ -10,18 +10,24 @@ import (
 	"log"
 )
 
-type shortNetworkDescription struct {
-	Name   string               `yaml:"name"`
-	Mode   string               `yaml:"mode"`
-	Bridge string               `yaml:"bridge"`
-	Mac    string               `yaml:"mac"`
-	IP     string               `yaml:"ip"`
-	Dhcp   shortDHCPDescription `yaml:"dhcp"`
+type NetworkDescription struct {
+	Name     string           `yaml:"name"`
+	Mode     string           `yaml:"mode"`
+	Bridge   string           `yaml:"bridge"`
+	Gateway  string           `yaml:"gateway"`
+	Netmask  string           `yaml:"netmask"`
+	Dhcp     DHCPDescription  `yaml:"dhcp"`
+	Machines []NetworkMachine `yaml:"machines,omitempty"`
 }
 
-type shortDHCPDescription struct {
+type DHCPDescription struct {
 	Start string `yaml:"start"`
 	End   string `yaml:"end"`
+}
+
+type NetworkMachine struct {
+	Name string `yaml:"name"`
+	Mac  string `yaml:"mac"`
 }
 
 var infoNetworkName string
@@ -35,7 +41,7 @@ var networkInfoCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		// generate short yaml description
-		info, err := getNetworkShortDescription(infoNetworkName)
+		info, err := getNetworkDescription(infoNetworkName)
 		if err != nil {
 			log.Panicf("Cannot get network '%s' info: %v", infoNetworkName, err)
 		}
@@ -48,19 +54,23 @@ var networkInfoCmd = &cobra.Command{
 }
 
 func init() {
+	// mandatory
 	networkInfoCmd.Flags().StringVarP(&infoNetworkName, "name", "n", "", "Name of the network to describe.")
 	if err := networkInfoCmd.MarkFlagRequired("name"); err != nil {
 		log.Panic(err.Error())
 	}
 }
 
-func getNetworkShortDescription(networkName string) (*shortNetworkDescription, error) {
+// getNetworkDescription provides the description of a libvirt network
+// do not confuse it with a domain interface
+func getNetworkDescription(networkName string) (netDesc *NetworkDescription, err error) {
 	// get network from name
 	network, err := LibvirtConnexion.NetworkLookupByName(networkName)
 	if err != nil {
 		Logger.Error("Cannot lookup network by name using Qemu connexion", "network", network.Name)
 		return nil, err
 	}
+
 	// get xml description from network
 	xmlDescription, err := LibvirtConnexion.NetworkGetXMLDesc(network, uint32(libvirt.NetworkXMLInactive))
 	if err != nil {
@@ -73,16 +83,55 @@ func getNetworkShortDescription(networkName string) (*shortNetworkDescription, e
 		Logger.Error("Cannot unmarshal domain XML description", "domain", infoNetworkName)
 		return nil, err
 	}
+
 	// generate short description
-	return &shortNetworkDescription{
-		Name:   description.Name,
-		Mode:   description.Forward.Mode,
-		Bridge: description.Bridge.Name,
-		Mac:    description.Mac.Address,
-		IP:     description.Ip.Address,
-		Dhcp: shortDHCPDescription{
+	netDesc = &NetworkDescription{
+		Name:    description.Name,
+		Mode:    description.Forward.Mode,
+		Bridge:  description.Bridge.Name,
+		Gateway: description.Ip.Address,
+		Netmask: description.Ip.Netmask,
+		Dhcp: DHCPDescription{
 			Start: description.Ip.Dhcp.Range.Start,
 			End:   description.Ip.Dhcp.Range.End,
 		},
-	}, nil
+	}
+
+	// get the machines using this network
+	machines, err := getNetworkDomains(networkName)
+	if err != nil {
+		return nil, fmt.Errorf("cannot list all the domains using network '%s': %w", networkName, err)
+	}
+	netDesc.Machines = machines
+
+	return
+}
+
+// getNetworkDomains list all the domains using the given network
+func getNetworkDomains(networkName string) (machines []NetworkMachine, err error) {
+	// get domains
+	domains, err := getDomainsList()
+	if err != nil {
+		return nil, fmt.Errorf("cannot get list of domains for network '%s': %w", networkName, err)
+	}
+
+	// filter domains for this network
+	for _, domain := range domains {
+		// get domain description
+		xmlDescription, err := getDomainXMLDescription(domain)
+		if err != nil {
+			return nil, fmt.Errorf("cannot get domain's '%s' xml description: %w", domain.Name, err)
+		}
+		// in this description, get interfaces descriptions and filter by network name
+		for _, iface := range xmlDescription.Devices.Interfaces {
+			if iface.Source.Network == networkName {
+				machines = append(machines, NetworkMachine{
+					Name: xmlDescription.Name,
+					Mac:  iface.Mac.Address,
+				})
+			}
+		}
+	}
+
+	return
 }

@@ -1,10 +1,11 @@
+#cloud-config
 hostname: vm1
 output:
-  all: '>> /var/log/cloud-init.log'
+    all: '>> /var/log/cloud-init.log'
 users:
-- name: freyja
-  lock_passwd: false
-  shell: /bin/bash
-  passwd: $6$GM./aNJikL/g$AR2c35i1QIaimKo/zOC/1Qg2JO65ysPPjv/leWBcgBXaxNV3V8IcgJVeTzt4VHWzcja66zsBnR1iyYtO2DPme/
+    - name: freyja
+      lock_passwd: false
+      shell: /bin/bash
+      passwd: "$6$GM./aNJikL/g$AR2c35i1QIaimKo/zOC/1Qg2JO65ysPPjv/leWBcgBXaxNV3V8IcgJVeTzt4VHWzcja66zsBnR1iyYtO2DPme/"
 package_update: false
 package_upgrade: false

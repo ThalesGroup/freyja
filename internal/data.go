@@ -6,7 +6,11 @@ type OSArch string
 
 type MemoryUnit string
 
+type VcpuPlacement string
+
 type LibOsInfoId string
+
+type OSBootDev string
 
 type DevicesEmulator string
 
@@ -40,6 +44,15 @@ const (
 
 const (
 	KiBMemoryUnit MemoryUnit = "KiB"
+	MiBMemoryUnit MemoryUnit = "MiB"
+)
+
+const (
+	StaticVcpuPlacement VcpuPlacement = "static"
+)
+
+const (
+	HdOsBootDev OSBootDev = "hd"
 )
 
 const (
@@ -67,11 +80,14 @@ const (
 const (
 	VirtioDeviceDiskTargetBus DeviceDiskTargetBus = "virtio"
 	SataDeviceDiskTargetBus   DeviceDiskTargetBus = "sata"
+	IdeDeviceDiskTargetBus    DeviceDiskTargetBus = "ide"
 )
 
 const (
 	VdaDeviceDiskTargetDev DeviceDiskTargetDev = "vda"
 	SdaDeviceDiskTargetDev DeviceDiskTargetDev = "sda"
+	HdaDeviceDiskTargetDev DeviceDiskTargetDev = "hda"
+	HdbDeviceDiskTargetDev DeviceDiskTargetDev = "hdb"
 )
 
 const (
@@ -143,110 +159,92 @@ var DefaultDeviceInterface XMLDomainDescriptionDevicesInterface = XMLDomainDescr
 // Parse the XML description to extract network interface information
 // Here's an example of a struct that can be used to unmarshal the network interface information
 //
-// <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-// <domain id="1" type="kvm">
+// <domain type="kvm">
 //
-//		<name>debian12</name>
-//		<uuid>716f0ab7-6382-4503-bdc3-0d5bc1765277</uuid>
-//		<description>debian12</description>
-//		<metadata>
-//		    <libosinfo:libosinfo xmlns:libosinfo="http://libosinfo.org/xmlns/libvirt/domain/1.0">
-//		        <libosinfo:os id="http://debian.org/debian/12"/>
-//		    </libosinfo:libosinfo>
-//		</metadata>
-//		<memory unit="KiB">4194304</memory>
-//		<currentMemory unit="KiB">4194304</currentMemory>
-//		<vcpu placement="static">2</vcpu>
-//		<os>
-//		    <type arch="x86_64" machine="pc-q35-7.2">hvm</type>
-//		    <boot dev="hd"/>
-//		</os>
-//		<devices>
-//		    <emulator>/usr/bin/qemu-system-x86_64</emulator>
-//		    <disk device="disk" type="file">
-//		        <driver name="qemu" type="qcow2"/>
-//		        <source file="/home/kaio/freyja-workspace/build/debian12/debian12_vdisk.debian12" index="2"/>
-//		        <backingStore index="3" type="file">
-//		            <format type="qcow2"/>
-//		            <source file="/home/kaio/Images/debian12"/>
-//		            <backingStore/>
-//		        </backingStore>
-//		        <target bus="virtio" dev="vda"/>
-//		        <alias name="virtio-disk0"/>
-//		        <address bus="0x04" domain="0x0000" function="0x0" slot="0x00" type="pci"/>
-//		    </disk>
-//		    <disk device="cdrom" type="file">
-//		        <driver name="qemu" type="raw"/>
-//		        <source file="/home/kaio/freyja-workspace/build/debian12/debian12_cloud_init.iso" index="1"/>
-//		        <backingStore/>
-//		        <target bus="sata" dev="sda"/>
-//		        <readonly/>
-//		        <alias name="sata0-0-0"/>
-//		        <address bus="0" controller="0" target="0" type="drive" unit="0"/>
-//		    </disk>
-//		    <interface type="network">
-//		        <mac address="52:54:00:25:77:0d"/>
-//		        <source bridge="virbr0" network="default" portid="5b2b65a8-8c46-4109-9117-38e4bbef3cd6"/>
-//		        <target dev="vnet0"/>
-//		        <model type="virtio"/>
-//		        <alias name="net0"/>
-//		        <address bus="0x01" domain="0x0000" function="0x0" slot="0x00" type="pci"/>
-//		    </interface>
-//			<!-- OTHER KIND OF DEVICES TO TEST -->
-//	        <serial type='pty'>
-//	          <target type='isa-serial' port='0'>
-//	            <model name='isa-serial'/>
-//	          </target>
-//	        </serial>
-//	        <console type='pty'>
-//	          <target type='serial' port='0'/>
-//	        </console>
-//	        <input type='mouse' bus='ps2'/>
-//	        <input type='keyboard' bus='ps2'/>
-//	        <audio id='1' type='none'/>
-//	        <memballoon model='virtio'>
-//	          <address type='pci' domain='0x0000' bus='0x00' slot='0x04' function='0x0'/>
-//	        </memballoon>
-//		</devices>
+//	<name>debian12-manual</name>
+//	<uuid>8220de9b-b004-4339-b770-cf8e312c5cb2</uuid>
+//	<memory unit="MiB">4096</memory>
+//	<vcpu placement="static">1</vcpu>
+//	<os>
+//	    <type arch='x86_64'>hvm</type>
+//	    <boot dev='hd'/>
+//	</os>
+//	<devices>
+//	    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+//	    <disk type="file" device="disk">
+//	        <driver name="qemu" type="qcow2"/>
+//	        <source file="/home/kaio/Projects/thales/freyja/test/manual/debian-12-generic-amd64.qcow2"/>
+//	        <target dev="hda" bus="ide"/>
+//	    </disk>
+//	    <disk type="file" device="cdrom">
+//	        <driver name="qemu" type="raw"/>
+//	        <source file="/home/kaio/Projects/thales/freyja/test/manual/debian12-cloud-init.iso"/>
+//	        <target dev="hdb" bus="ide"/>
+//	        <readonly/>
+//	    </disk>
+//	    <interface type="network">
+//	        <mac address="52:54:00:17:49:b7"/>
+//	        <source network="default"/>
+//	    </interface>
+//	    <console type='pty'>
+//	        <target type='serial'/>
+//	    </console>
+//	</devices>
 //
 // </domain>
 type XMLDomainDescription struct {
 	// root
 	XMLName  xml.Name                      `xml:"domain"`
 	Type     string                        `xml:"type,attr"`
-	ID       string                        `xml:"id,attr"`
 	Name     string                        `xml:"name"`
 	UUID     string                        `xml:"uuid"`
-	Vcpu     uint                          `xml:"vcpu"`
+	Vcpu     *XMLDomainDescriptionVcpu     `xml:"vcpu"`
 	Memory   *XMLDomainDescriptionMemory   `xml:"memory"`
 	OS       *XMLDomainDescriptionOS       `xml:"os"`
 	Metadata *XMLDomainDescriptionMetadata `xml:"metadata,omitempty"`
 	Devices  *XMLDomainDescriptionDevices  `xml:"devices"`
 }
 
+// XMLDomainDescriptionVcpu
+//
+//	<vcpu placement="static">1</vcpu>
+type XMLDomainDescriptionVcpu struct {
+	XMLName   xml.Name `xml:"vcpu"`
+	Placement string   `xml:"placement,attr"`
+	Value     uint64   `xml:",chardata"`
+}
+
 // XMLDomainDescriptionMemory
-// <memory unit="KiB">4194304</memory>
+// <memory unit="MiB">4096</memory>
 type XMLDomainDescriptionMemory struct {
-	Unit  string `xml:"unit,attr"`
-	Value uint64 `xml:",chardata"`
+	XMLName xml.Name `xml:"memory"`
+	Unit    string   `xml:"unit,attr"`
+	Value   uint64   `xml:",chardata"`
 }
 
 // XMLDomainDescriptionOS
+//
 // <os>
 //
-//	<type arch="x86_64" machine="pc-q35-7.2">hvm</type>
+//	<type arch="x86_64">hvm</type>
 //	<boot dev="hd"/>
 //
 // </os>
 type XMLDomainDescriptionOS struct {
 	XMLName xml.Name                    `xml:"os"`
 	Type    *XMLDomainDescriptionOSType `xml:"type"`
+	Boot    *XMLDomainDescriptionOSBoot `xml:"boot"`
 }
 
 type XMLDomainDescriptionOSType struct {
 	XMLName xml.Name `xml:"type"`
 	Arch    string   `xml:"arch,attr"`
 	Type    string   `xml:",chardata"`
+}
+
+type XMLDomainDescriptionOSBoot struct {
+	XMLName xml.Name `xml:"boot"`
+	Dev     string   `xml:"dev,attr"`
 }
 
 // XMLDomainDescriptionMetadata
@@ -273,26 +271,33 @@ type XMLDomainDescriptionMetadataLibOsInfoOs struct {
 
 // XMLDomainDescriptionDevices
 //
-//	<disk device="disk" type="file">
-//	    <driver name="qemu" type="qcow2"/>
-//	    <source file="/home/kaio/freyja-workspace/build/debian12/debian12_vdisk.debian12" index="2"/>
-//	    <backingStore index="3" type="file">
-//	        <format type="qcow2"/>
-//	        <source file="/home/kaio/Images/debian12"/>
-//	        <backingStore/>
-//	    </backingStore>
-//	    <target bus="virtio" dev="vda"/>
-//	    <alias name="virtio-disk0"/>
-//	    <address bus="0x04" domain="0x0000" function="0x0" slot="0x00" type="pci"/>
-//	</disk>
-
+//	<devices>
+//	    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+//	    <disk type="file" device="disk">
+//	        <driver name="qemu" type="qcow2"/>
+//	        <source file="/home/kaio/Projects/thales/freyja/test/manual/debian-12-generic-amd64.qcow2"/>
+//	        <target dev="hda" bus="ide"/>
+//	    </disk>
+//	    <disk type="file" device="cdrom">
+//	        <driver name="qemu" type="raw"/>
+//	        <source file="/home/kaio/Projects/thales/freyja/test/manual/debian12-cloud-init.iso"/>
+//	        <target dev="hdb" bus="ide"/>
+//	        <readonly/>
+//	    </disk>
+//	    <interface type="network">
+//	        <mac address="52:54:00:17:49:b7"/>
+//	        <source network="default"/>
+//	    </interface>
+//	    <console type='pty'>
+//	        <target type='serial'/>
+//	    </console>
+//	</devices>
 type XMLDomainDescriptionDevices struct {
 	XMLName xml.Name `xml:"devices"`
 	// no xml name because it is a list
 	Emulator   string                                 `xml:"emulator"`
 	Disks      []XMLDomainDescriptionDevicesDisk      `xml:"disk"`
 	Interfaces []XMLDomainDescriptionDevicesInterface `xml:"interface"`
-	Serial     []XMLDomainDescriptionDevicesSerial    `xml:"serial,omitempty"`
 	Console    []XMLDomainDescriptionDevicesConsole   `xml:"console,omitempty"`
 }
 
@@ -393,35 +398,10 @@ type XMLDomainDescriptionDevicesInterfaceModel struct {
 	Type    string   `xml:"type,attr"`
 }
 
-// XMLDomainDescriptionDevicesSerial
-//
-//	<serial type='pty'>
-//	  <target type='isa-serial' port='0'>
-//	    <model name='isa-serial'/>
-//	  </target>
-//	</serial>
-type XMLDomainDescriptionDevicesSerial struct {
-	XMLName xml.Name                                 `xml:"serial"`
-	Type    string                                   `xml:"type,attr"`
-	Target  *XMLDomainDescriptionDevicesSerialTarget `xml:"target"`
-}
-
-type XMLDomainDescriptionDevicesSerialTarget struct {
-	XMLName xml.Name                                      `xml:"target"`
-	Type    string                                        `xml:"type,attr"`
-	Port    string                                        `xml:"port,attr,omitempty"`
-	Model   *XMLDomainDescriptionDevicesSerialTargetModel `xml:"model"`
-}
-
-type XMLDomainDescriptionDevicesSerialTargetModel struct {
-	XMLName xml.Name `xml:"model"`
-	Name    string   `xml:"name,attr"`
-}
-
 // XMLDomainDescriptionDevicesConsole
 //
 //	<console type='pty'>
-//	  <target type='serial' port='0'/>
+//	    <target type='serial'/>
 //	</console>
 type XMLDomainDescriptionDevicesConsole struct {
 	XMLName xml.Name                                  `xml:"console"`
@@ -432,7 +412,6 @@ type XMLDomainDescriptionDevicesConsole struct {
 type XMLDomainDescriptionDevicesConsoleTarget struct {
 	XMLName xml.Name `xml:"target"`
 	Type    string   `xml:"type,attr"`
-	Port    string   `xml:"port,attr,omitempty"`
 }
 
 // XMLNetworkDescription example
@@ -497,6 +476,7 @@ type XMLNetworkDescriptionMac struct {
 type XMLNetworkDescriptionIp struct {
 	XMLName xml.Name                     `xml:"ip"`
 	Address string                       `xml:"address,attr"`
+	Netmask string                       `xml:"netmask,attr"`
 	Dhcp    *XMLNetworkDescriptionIpDhcp `xml:"dhcp"`
 }
 
@@ -690,7 +670,7 @@ type CloudInitUserDataUser struct {
 	Sudo              []string `yaml:"sudo,omitempty"` // example if sudo : [ 'ALL=(ALL) NOPASSWD:ALL' ]
 	LockPasswd        bool     `yaml:"lock_passwd"`    // default: false
 	Shell             string   `yaml:"shell"`          // default: /bin/bash
-	Passwd            string   `yaml:"passwd"`
+	Passwd            string   `yaml:"passwd,flow"`
 	Groups            string   `yaml:"groups,omitempty"` // comma-separated string, ex: freyja, libvirt, sudo
 	SshAuthorizedKeys []string `yaml:"ssh_authorized_keys,omitempty"`
 }

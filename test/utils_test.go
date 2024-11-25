@@ -25,20 +25,6 @@ func TestGenerateUUID(t *testing.T) {
 		t.Logf("UUID string '%s' does not match regex '%s'", uuid, uuidRegex)
 		t.Fail()
 	}
-
-}
-
-func TestCheckIfFileExists(t *testing.T) {
-	exists := "/dev/null"
-	DoesntExist := "dumb"
-	if err := internal.CheckIfFileExists(exists); err != nil {
-		t.Logf("File '%s' detected as absent but exists : %v", exists, err)
-		t.Fail()
-	}
-	if err := internal.CheckIfFileExists(DoesntExist); err == nil {
-		t.Logf("File '%s' detected as present but does not exist", exists)
-		t.Fail()
-	}
 }
 
 func TestKibToGiB(t *testing.T) {

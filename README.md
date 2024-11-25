@@ -14,10 +14,18 @@ Simple usage :
 
 🚀 Visit [https://thalesgroup.github.io/freyja/](https://thalesgroup.github.io/freyja/) 🚀
 
-## Developers
+## Contributing
 
 Read our guide : [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ### Security
 
 Please respect our security guidelines in our guide : [SECURITY.md](SECURITY.md)
+
+### Development
+
+Build:
+
+```sh
+go build -o freyja cmd/freyja/main.go
+```

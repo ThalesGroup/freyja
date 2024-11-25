@@ -2,52 +2,23 @@ package internal
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v2"
+	"github.com/kdomanski/iso9660"
+	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 	"strings"
 )
+
+const ISOCloudInitFileSuffix string = "-cloud-init.iso"
 
 type CloudInitConfiguration interface {
 	Build(machine *ConfigurationMachine) error
 	Write(directory string) error
 }
 
-func writeCloudInitConfig(directory string, filename string, ci interface{}) error {
-	// create the config dir if it does exist yet
-	err := os.MkdirAll(directory, os.ModePerm)
-	if err != nil {
-		return fmt.Errorf("could not create cloud init into parent directory '%s' for file '%s': %w", directory, filename, err)
-	}
-	// convert cloud init config to bytes
-	metadata, err := yaml.Marshal(&ci)
-	if err != nil {
-		return fmt.Errorf("could not parse cloud init config file '%s' into bytes: %w", filename, err)
-	}
-	// open the file to inject multiple data
-	path := filepath.Join(directory, filename)
-	file, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0770)
-	if err != nil {
-		return fmt.Errorf("could not open cloud init config file '%s': %w", path, err)
-	}
-	// inject the mandatory '#cloud-config' string at the beginning of the file
-	if _, err = file.WriteString(CloudInitUserDataHeader); err != nil {
-		return fmt.Errorf("could not write cloud init config for machine '%s' into file '%s': %w", filename, path, err)
-	}
-	// inject the cloud init user data
-	if _, err = file.Write(metadata); err != nil {
-		return fmt.Errorf("could not write cloud init config for machine '%s' into file '%s': %w", filename, path, err)
-	}
-	return nil
-}
+const CloudInitMetadataFileName = "meta-data"
 
-//
-// METADATA
-//
-
-const CloudInitMetadataFileSuffix = "-cloudinit-metadata.yaml"
-
-const CloudInitUserDataFileSuffix = "-cloudinit-userdata.yaml"
+const CloudInitUserDataFileName = "user-data"
 
 func (ci *CloudInitMetadata) Build(machine *ConfigurationMachine) error {
 	ci.InstanceID = machine.Hostname
@@ -55,8 +26,12 @@ func (ci *CloudInitMetadata) Build(machine *ConfigurationMachine) error {
 	return nil
 }
 
-func (ci *CloudInitMetadata) Write(directory string) error {
-	return writeCloudInitConfig(directory, GetCloudInitMetadataFilename(ci.LocalHostname), &ci)
+func (ci *CloudInitMetadata) Write(directory string) (err error) {
+	var data []byte
+	if data, err = yaml.Marshal(ci); err != nil {
+		return fmt.Errorf("could not parse cloud init meta data in '%s': %w", directory, err)
+	}
+	return writeCloudInitConfig(directory, CloudInitMetadataFileName, data)
 }
 
 // USER DATA
@@ -88,7 +63,8 @@ func (ci *CloudInitUserData) Build(machine *ConfigurationMachine) error {
 		if u.Keys != nil {
 			keys := make([]string, len(u.Keys))
 			for j, key := range u.Keys {
-				content, err := os.ReadFile(key)
+				resolvedKeyPath := os.ExpandEnv(key)
+				content, err := os.ReadFile(resolvedKeyPath)
 				if err != nil {
 					return err
 				}
@@ -136,13 +112,84 @@ func (ci *CloudInitUserData) Build(machine *ConfigurationMachine) error {
 	return nil
 }
 
-func (ci *CloudInitUserData) Write(directory string) error {
-	return writeCloudInitConfig(directory, GetCloudInitUserDataFilename(ci.Hostname), &ci)
+// marshal is a custom function to parse the cloud init user data to a yaml file data
+// this is necessary for YAML v3 package
+// YAML v3 package struggles to handle double quoting strings and we need to enforce them for few
+// config fields
+func (ci *CloudInitUserData) marshal() (data []byte, err error) {
+
+	// Convert the input to a YAML node
+	var node yaml.Node
+	if err = node.Encode(ci); err != nil {
+		return nil, err
+	}
+
+	// Running through the yaml nodes to customize the output
+	// Root node
+	for i, subnode := range node.Content {
+		// "users" map
+		if subnode.Value == "users" {
+			usersNode := node.Content[i+1]
+			// for each user
+			for _, userNode := range usersNode.Content {
+				var passwdValueNode *yaml.Node
+				// for each config of a user
+				for j, userField := range userNode.Content {
+					// finding 'passwd' config
+					if userField.Value == "passwd" {
+						passwdValueNode = userNode.Content[j+1]
+						passwdValueNode.Style = yaml.DoubleQuotedStyle
+					}
+				}
+			}
+		}
+	}
+
+	// Marshal the modified node back to YAML
+	return yaml.Marshal(&node)
+}
+
+func (ci *CloudInitUserData) Write(directory string) (err error) {
+	var data []byte
+	if data, err = ci.marshal(); err != nil {
+		return fmt.Errorf("could not parse cloud init user data in '%s': %w", directory, err)
+	}
+	return writeCloudInitConfig(directory, CloudInitUserDataFileName, data)
 }
 
 //
-// UTILS
+// GENERATE
 //
+
+// writeCloudInitConfig writes both user data and metadata cloud init files into the given output
+// directory.
+// The array of bytes 'data' is the serialization result of the cloud init configuration.
+func writeCloudInitConfig(directory string, filename string, data []byte) (err error) {
+	// create the config dir if it does exist yet
+	err = os.MkdirAll(directory, os.ModePerm)
+	if err != nil {
+		return fmt.Errorf("could not create cloud init into parent directory '%s' for file '%s': %w", directory, filename, err)
+	}
+	// re-create the file to inject data
+	path := filepath.Join(directory, filename)
+	_, err = RemoveIfExists(path)
+	if err != nil {
+		return fmt.Errorf("could not remove file '%s': %w", path, err)
+	}
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("cannot create cloud init file '%s' : %w", path, err)
+	}
+	// inject the mandatory '#cloud-config' string at the beginning of the file
+	if _, err = file.WriteString(CloudInitUserDataHeader); err != nil {
+		return fmt.Errorf("could not write cloud init config for machine '%s' into file '%s': %w", filename, path, err)
+	}
+	// inject the cloud init user data
+	if _, err = file.Write(data); err != nil {
+		return fmt.Errorf("could not write cloud init config for machine '%s' into file '%s': %w", filename, path, err)
+	}
+	return nil
+}
 
 func GenerateCloudInitConfigs(machine *ConfigurationMachine, outputDir string) error {
 	// metadata generation
@@ -168,10 +215,62 @@ func GenerateCloudInitConfigs(machine *ConfigurationMachine, outputDir string) e
 	return nil
 }
 
-func GetCloudInitMetadataFilename(hostname string) string {
-	return fmt.Sprintf("%s%s", hostname, CloudInitMetadataFileSuffix)
-}
+//
+// ISO
+//
 
-func GetCloudInitUserDataFilename(hostname string) string {
-	return fmt.Sprintf("%s%s", hostname, CloudInitUserDataFileSuffix)
+// CreateCloudInitIso creates the ISO file following the iso9660 standard.
+// Implementation using kdomanski/iso9660 : https://github.com/kdomanski/iso9660
+// it is also used in terraform for proxmox : https://github.com/Telmate/terraform-provider-proxmox/blob/186ec3f23bf4a62fcad35f6292fa1350b8e1183b/proxmox/resource_cloud_init_disk.go#L77-L122
+// YOU MUST name the provision files 'user-data' 'meta-data' !!!!!!!!
+// YOU MUST name the ISO volume 'cidata' !!!!!!
+func CreateCloudInitIso(machine *ConfigurationMachine, machineDir string) (string, error) {
+	isoWriter, err := iso9660.NewWriter()
+	if err != nil {
+		return "", fmt.Errorf("cannot create the iso9660 writer for the machine '%s' : %w", machine.Hostname, err)
+	}
+	// add cloud init metadata in ISO
+	metadataPath := filepath.Join(machineDir, CloudInitMetadataFileName)
+	fm, err := os.Open(metadataPath)
+	if err != nil {
+		return "", fmt.Errorf("cannot open the cloud init metadata file in '%s' : %w", metadataPath, err)
+	}
+	defer fm.Close()
+	// YOU MUST name the provision files 'user-data' 'meta-data' !!!!!!!!
+	if err = isoWriter.AddFile(fm, "meta-data"); err != nil {
+		return "", fmt.Errorf("cannot add the cloud init metadata file in ISO for the machine '%s' : %w", machine.Hostname, err)
+	}
+	// add cloud init user data in ISO
+	userdataPath := filepath.Join(machineDir, CloudInitUserDataFileName)
+	fu, err := os.Open(userdataPath)
+	if err != nil {
+		return "", fmt.Errorf("cannot open the cloud init user data file in '%s' : %w", userdataPath, err)
+	}
+	defer fu.Close()
+	// YOU MUST name the provision files 'user-data' 'meta-data' !!!!!!!!
+	if err = isoWriter.AddFile(fu, "user-data"); err != nil {
+		return "", fmt.Errorf("cannot add the cloud init user data file in ISO for the machine '%s' : %w", machine.Hostname, err)
+	}
+	// delete pre-existing ISO file for provision update
+
+	// write iso on filesystem
+	isoOutputPath := filepath.Join(machineDir, fmt.Sprintf("%s%s", machine.Hostname, ISOCloudInitFileSuffix))
+	_, err = RemoveIfExists(isoOutputPath)
+	if err != nil {
+		return "", fmt.Errorf("cannot replace the cloud init ISO file in '%s' : %w", isoOutputPath, err)
+	}
+	outputFile, err := os.OpenFile(isoOutputPath, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, 0664)
+	if err != nil {
+		return "", fmt.Errorf("cannot open the ISO image file path '%s' : %w", isoOutputPath, err)
+	}
+	// calculate the iso file ID
+	// YOU MUST name the ISO volume 'cidata' !!!!!!
+	if err = isoWriter.WriteTo(outputFile, "cidata"); err != nil {
+		return "", fmt.Errorf("cannot write the ISO image file in '%s' : %w", isoOutputPath, err)
+	}
+	if err = outputFile.Close(); err != nil {
+		return "", err
+	}
+
+	return isoOutputPath, nil
 }

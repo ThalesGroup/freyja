@@ -51,3 +51,8 @@ Remove the created virtual machine :
 ```sh
 freyja machine delete freyja-ubuntu
 ```
+
+Remove vm from config file
+```sh
+freyja machine delete -c examples/basic.yaml
+```

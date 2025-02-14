@@ -14,6 +14,7 @@ from freyja.lib.exceptions.configuration_exceptions import ConfigurationContentE
     ConfigurationFormatError
 from freyja.lib.utils.subprocess_utils import yes_no_question
 from freyja.logger import FreyjaLogger
+from freyja.configuration import Configuration
 
 app = typer.Typer(help="Manage virtual machines")
 
@@ -91,7 +92,7 @@ def delete(names: List[str] = typer.Argument(None, help="VM names to delete"),
                                               file_okay=True,
                                               readable=True,
                                               resolve_path=True,
-                                              help="Configuration file to create the virtual "
+                                              help="Configuration file to delete the virtual "
                                                    "machine"),):
     """
     Destroy and undefine one or more virtual machines based on names, or all

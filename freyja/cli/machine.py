@@ -14,6 +14,7 @@ from freyja.lib.exceptions.configuration_exceptions import ConfigurationContentE
     ConfigurationFormatError
 from freyja.lib.utils.subprocess_utils import yes_no_question
 from freyja.logger import FreyjaLogger
+from freyja.configuration import Configuration
 
 app = typer.Typer(help="Manage virtual machines")
 
@@ -85,13 +86,26 @@ def restart(names: List[str] = typer.Argument(..., help="VM names list to reboot
 
 @app.command()
 def delete(names: List[str] = typer.Argument(None, help="VM names to delete"),
-           del_all: bool = typer.Option(False, "-a", "--all", help="Delete all machines")):
+           del_all: bool = typer.Option(False, "-a", "--all", help="Delete all machines"),
+           configuration: Path = typer.Option(None, "-c", "--config",
+                                              exists=True,
+                                              file_okay=True,
+                                              readable=True,
+                                              resolve_path=True,
+                                              help="Configuration file to delete the virtual "
+                                                   "machine"),):
     """
     Destroy and undefine one or more virtual machines based on names, or all
     """
     if del_all:
         names = list(filter(None, list_machines(names=True, stdout=False)))
-    logger.warning(f"The following machines will be destroyed: {names}")
+        logger.warning(f"The following machines will be destroyed: {names}")
+    if configuration:
+        names = []
+        _configuration = Configuration.parse_file(configuration)
+        for host in _configuration.hosts:
+            names.append(host.hostname)
+        logger.warning(f"The following machines will be destroyed: {names}")
     if yes_no_question("Are you sure ? (Y/n)[default: n]", False):
         delete_machines(names)
         logger.info("OK")

@@ -2,7 +2,7 @@ import logging
 
 import typer
 
-from freyja.cli import machine, network
+from freyja.cli import machine, network, snapshot
 from freyja.environment import FreyjaEnvironment
 from freyja.logger import FreyjaLogger
 
@@ -10,6 +10,7 @@ app = typer.Typer(help=f"Manage virtual machine and network using QEMU and KVM",
                   no_args_is_help=True)
 app.add_typer(machine.app, name="machine")
 app.add_typer(network.app, name="network")
+app.add_typer(snapshot.app, name="snapshot")
 
 logger = logging.getLogger(FreyjaLogger.name)
 

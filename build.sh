@@ -2,6 +2,9 @@
 
 SCRIPT_PATH="$(realpath "$0")"
 PROJECT_DIR="$(dirname "${SCRIPT_PATH:?}")"
+DIST_DIR="${PROJECT_DIR:?}/dist"
+BIN_NAME="freyja"
+GO_MAIN="${PROJECT_DIR:?}/cmd/freyja/main.go"
 
 #
 # FUNCTIONS
@@ -19,21 +22,14 @@ function check_requirement(){
 # MAIN
 #
 
-check_requirement poetry --version "Install poetry first"
+#check_requirement go version "Install Go first"
+
+echo "Build freyja"
 
 cd "${PROJECT_DIR}" || exit
-echo "Build environment :"
-poetry env info
+mkdir -p "${DIST_DIR:?}"
+go build -o "${DIST_DIR:?}/${BIN_NAME}" "${GO_MAIN:?}"
 
-echo ""
-echo "Update dependencies"
-poetry check
-poetry update --without dev
-poetry install --without dev --sync
+echo "Built in ${DIST_DIR:?}/${BIN_NAME}"
 
-echo "Build Freyja"
-rm -rf "${PROJECT_DIR}/dist"
-poetry build --format wheel
-
-echo "Built in dist/:"
-ls "./dist/"
+exit 0

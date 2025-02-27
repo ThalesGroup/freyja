@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"log"
 	"os"
+	"strings"
 )
 
 var deleteDomainName string
@@ -20,6 +21,7 @@ var machineDeleteCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		// user confirmation
+		Logger.Info("delete", "machines", deleteDomainName)
 		agree, err := internal.AskUserYesNoConfirmation()
 		if err != nil {
 			if errors.Is(err, internal.ErrUserInput) {
@@ -34,25 +36,24 @@ var machineDeleteCmd = &cobra.Command{
 			// get domain by name
 			domain, err := LibvirtConnexion.DomainLookupByName(deleteDomainName)
 			if err != nil {
-				Logger.Error("Cannot lookup domain from qemu connexion", "domain", deleteDomainName, "reason", err)
-				os.Exit(1)
+				if strings.Contains(err.Error(), "not found") {
+					Logger.Warn("canceled : machines not found", "machines", deleteDomainName)
+					os.Exit(0)
+				} else {
+					Logger.Error("cannot lookup domain from qemu connexion", "domain", deleteDomainName, "reason", err)
+					os.Exit(1)
+				}
 			}
 
 			if err = LibvirtConnexion.DomainDestroyFlags(domain, libvirt.DomainDestroyDefault); err != nil {
-				Logger.Error("Cannot stop the domain", "domain", deleteDomainName, "reason", err)
+				Logger.Error("cannot stop the machines", "machines", deleteDomainName, "reason", err)
 				os.Exit(1)
 			}
 
-			if err = LibvirtConnexion.DomainUndefine(domain); err != nil {
-				Logger.Error("Cannot delete the domain", "domain", deleteDomainName, "reason", err)
-				os.Exit(1)
-			}
-
-			// TODO if pool is still present, destroy and undefine it
-			// TODO finally delete the freyja folder for this machine
+			Logger.Info("deleted", "machines", deleteDomainName)
 
 		} else {
-			Logger.Info("Canceled")
+			Logger.Info("canceled")
 		}
 	},
 }

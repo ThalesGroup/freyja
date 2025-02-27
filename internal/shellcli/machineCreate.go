@@ -35,16 +35,8 @@ var machineCreateCmd = &cobra.Command{
 	TraverseChildren: true, // ensure local flags do not spread to sub commands
 
 	Run: func(cmd *cobra.Command, args []string) {
+		Logger.Debug("create machines from configuration file", "config", configurationPath)
 		// TODO :
-		//	 - If strings in 'user-data' are note quoted, some chars are messing with the disk mount and libvirt goes crazy at startup
-		//     MAKE SURE THAT ALL STRINGS ARE QUOTED IN CLOUD INIT CONFIG FILES
-		//		to do this, customize the marshaller using yaml.v3.
-		//      need to update go version ?
-		//   - ssh keys are wrongly injected by cloud init. Is it still working ?
-		//     check cloud init config user-data. Example :
-		//     "  ssh_authorized_keys:
-		//        - |
-		//        ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILISxfJd/91TY9DH97/Y6t2zejV8p0x7L4Ygjy45iMPp kaio@kaio-host
 		//   - test with multiple ssh keys
 		//   - create the network if it does not already exists
 		// build config from path
@@ -56,24 +48,27 @@ var machineCreateCmd = &cobra.Command{
 		// build cloud init config file
 		//var cloudInitData internal.CloudInitUserData
 		for _, machine := range configurationData.Machines {
-			//if err := cloudInitData.Build(&machine); err != nil {
-			//	Logger.Error("cannot build cloud init specs from machine configuration", "configuration", machine, "reason", err)
-			//	os.Exit(1)
-			//}
+			Logger.Info("create", "machine", machine.Hostname)
+
 			// create machine directory
+			Logger.Debug("create machine dir", "machine", machine.Hostname, "parent", FreyjaMachinesWorkspaceDir)
 			machineDirPath, err := createMachineDir(&machine)
 			if err != nil {
 				Logger.Error("cannot create machine workspace directory", "machine", machine.Hostname, "reason", err.Error())
 				os.Exit(1)
 			}
+
 			// create cloud init metadata and user data files
 			// YOU MUST name the provision files 'user-data' 'meta-data' !!!!!!!!
 			// YOU MUST name the ISO volume 'cidata' !!!!!!
+			Logger.Debug("create cloud init user-data and meta-data", "machine", machine.Hostname, "parent", machineDirPath)
 			if err := internal.GenerateCloudInitConfigs(&machine, machineDirPath); err != nil {
 				Logger.Error("cannot create machine cloud init configurations", "machine", machine.Hostname, "reason", err.Error())
 				os.Exit(1)
 			}
+
 			// create cloud-init iso file
+			Logger.Debug("create cloud ISO file", "machine", machine.Hostname, "parent", machineDirPath)
 			cloudInitIsoFile, err := internal.CreateCloudInitIso(&machine, machineDirPath)
 			if err != nil {
 				Logger.Error("Cannot create machine ISO image file", "machine", machine.Hostname, "reason", err.Error())
@@ -81,15 +76,19 @@ var machineCreateCmd = &cobra.Command{
 			}
 
 			// copy root image to the machine dir
-			rootImageSourcePath := os.ExpandEnv(machine.Image)
-			rootImageDestinationPath := os.ExpandEnv(filepath.Join(machineDirPath, machine.Hostname+RootImageFileSuffix))
-			if err := internal.CopyFile(rootImageSourcePath, rootImageDestinationPath, 0700); err != nil {
-				Logger.Error("Cannot copy machine root image file", "machine", machine.Hostname, "reason", fmt.Sprintf("%v", err.Error()))
-				os.Exit(1)
-			}
+			// !!! NOT SURE IF ROOT IMAGE FILE SHOULD BE COPIED AS WELL
+			// basically, no because overlay is made for single machine usage on top of root image
+			//rootImageSourcePath := os.ExpandEnv(machine.Image)
+			//Logger.Debug("copy machine image file from root", "machine", machine, "root", rootImageSourcePath, "destination", rootImageDestinationPath)
+			//if err := internal.CopyFile(rootImageSourcePath, rootImageDestinationPath, 0700); err != nil {
+			//	Logger.Error("Cannot copy machine root image file", "machine", machine.Hostname, "reason", fmt.Sprintf("%v", err.Error()))
+			//	os.Exit(1)
+			//}
 
 			// using : https://github.com/dypflying/go-qcow2lib/blob/main/examples/backing/qcow2_backing.go
 			// use 'qemu-img info' to verify it
+			rootImageDestinationPath := os.ExpandEnv(filepath.Join(machineDirPath, machine.Hostname+RootImageFileSuffix))
+			Logger.Debug("create machine image overlay from root image", "machine", machine.Hostname, "parent", machineDirPath, "root", os.ExpandEnv(machine.Image))
 			overlayFile, err := createOverlayImage(&machine, rootImageDestinationPath, machineDirPath)
 			if err != nil {
 				Logger.Error("Cannot create machine overlay image file", "machine", machine.Hostname, "reason", fmt.Sprintf("%v", err.Error()))
@@ -99,12 +98,12 @@ var machineCreateCmd = &cobra.Command{
 			// create the xml description of the libvirt domain from the machine configuration
 			// also injects the overlay image file for qemu
 			// also injects the cloud init files for startup sequence
+			Logger.Debug("create machine's XML libvirt description", "machine", machine.Hostname, "parent", machineDirPath)
 			xmlMachineDescription, err := createLibvirtDomainXMLDescription(&machine, overlayFile, cloudInitIsoFile)
 			if err != nil {
 				Logger.Error("cannot create the libvirt domain XML description from machine configuration", "machine", machine.Hostname, "reason", fmt.Sprintf("%v", err))
 				os.Exit(1)
 			}
-
 			// dump description in machine dir (useful for debug)
 			xmlMachineDescriptionPath := filepath.Join(machineDirPath, machine.Hostname+XMLMachineDescriptionSuffix)
 			if err := os.WriteFile(xmlMachineDescriptionPath, xmlMachineDescription, 0660); err != nil {
@@ -121,9 +120,9 @@ var machineCreateCmd = &cobra.Command{
 					Logger.Error("cannot create the machine from libvirt domain XML description", "machine", machine.Hostname, "reason", err)
 					os.Exit(1)
 				}
+			} else {
+				Logger.Warn("skipped startup", "machine", machine.Hostname, "reason", "option --dry-run")
 			}
-
-			log.Print("OK")
 		}
 
 	},

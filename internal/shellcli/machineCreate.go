@@ -141,9 +141,19 @@ func init() {
 	machineCreateCmd.Flags().BoolVarP(&dryRun, "dry-run", "", false, "Generate all config files without creating the machine")
 }
 
+// getMachineDirByConf builds the machine directory path from its configuration
+func getMachineDirByConf(machine *internal.ConfigurationMachine) string {
+	return filepath.Join(FreyjaMachinesWorkspaceDir, machine.Hostname)
+}
+
+// getMachineDirByName builds the machine directory path from its configuration
+func getMachineDirByName(machineName string) string {
+	return filepath.Join(FreyjaMachinesWorkspaceDir, machineName)
+}
+
 // createMachineDir returns the created dir, or an error
 func createMachineDir(machine *internal.ConfigurationMachine) (string, error) {
-	machineDirPath := filepath.Join(FreyjaMachinesWorkspaceDir, machine.Hostname)
+	machineDirPath := getMachineDirByConf(machine)
 	if _, err := os.Stat(machineDirPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(machineDirPath, os.ModePerm); err != nil {
 			return "", err

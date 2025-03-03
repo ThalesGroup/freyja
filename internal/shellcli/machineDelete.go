@@ -3,7 +3,6 @@ package shellcli
 import (
 	"errors"
 	"freyja/internal"
-	"github.com/digitalocean/go-libvirt"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
@@ -20,6 +19,19 @@ var machineDeleteCmd = &cobra.Command{
 	TraverseChildren: true, // ensure local flags do not spread to sub commands
 
 	Run: func(cmd *cobra.Command, args []string) {
+		// get domain by name
+		domain, err := LibvirtConnexion.DomainLookupByName(deleteDomainName)
+		// cancel if the machine is not found
+		if err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				Logger.Warn("canceled", "reason", "machine not found", "machine", deleteDomainName)
+				os.Exit(0)
+			} else {
+				Logger.Error("cannot find the machine", "machine", deleteDomainName, "reason", err)
+				os.Exit(1)
+			}
+		}
+
 		// user confirmation
 		Logger.Info("delete", "machines", deleteDomainName)
 		agree, err := internal.AskUserYesNoConfirmation()
@@ -33,23 +45,22 @@ var machineDeleteCmd = &cobra.Command{
 
 		// exec
 		if agree {
-			// get domain by name
-			domain, err := LibvirtConnexion.DomainLookupByName(deleteDomainName)
-			if err != nil {
-				if strings.Contains(err.Error(), "not found") {
-					Logger.Warn("canceled : machines not found", "machines", deleteDomainName)
-					os.Exit(0)
-				} else {
-					Logger.Error("cannot lookup domain from qemu connexion", "domain", deleteDomainName, "reason", err)
-					os.Exit(1)
-				}
-			}
-
-			if err = LibvirtConnexion.DomainDestroyFlags(domain, libvirt.DomainDestroyDefault); err != nil {
+			// stop libvirt domain
+			if err = LibvirtConnexion.DomainDestroy(domain); err != nil {
 				Logger.Error("cannot stop the machines", "machines", deleteDomainName, "reason", err)
 				os.Exit(1)
 			}
-
+			// undefine libvirt domain
+			if err = LibvirtConnexion.DomainUndefine(domain); err != nil {
+				Logger.Error("cannot undefine the machines", "machines", deleteDomainName, "reason", err)
+				os.Exit(1)
+			}
+			// delete machine directory in filesystem
+			machineDirPath := getMachineDirByName(deleteDomainName)
+			if err = os.RemoveAll(machineDirPath); err != nil {
+				Logger.Error("cannot remove machine directory", "machine", deleteDomainName, "dir", machineDirPath, "error", err)
+				os.Exit(1)
+			}
 			Logger.Info("deleted", "machines", deleteDomainName)
 
 		} else {

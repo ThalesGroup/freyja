@@ -6,7 +6,6 @@ import (
 	"encoding/xml"
 	"fmt"
 	"freyja/internal"
-	"github.com/digitalocean/go-libvirt"
 	"github.com/dypflying/go-qcow2lib/qcow2"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
@@ -78,16 +77,17 @@ var machineCreateCmd = &cobra.Command{
 			// copy root image to the machine dir
 			// !!! NOT SURE IF ROOT IMAGE FILE SHOULD BE COPIED AS WELL
 			// basically, no because overlay is made for single machine usage on top of root image
-			//rootImageSourcePath := os.ExpandEnv(machine.Image)
-			//Logger.Debug("copy machine image file from root", "machine", machine, "root", rootImageSourcePath, "destination", rootImageDestinationPath)
-			//if err := internal.CopyFile(rootImageSourcePath, rootImageDestinationPath, 0700); err != nil {
-			//	Logger.Error("Cannot copy machine root image file", "machine", machine.Hostname, "reason", fmt.Sprintf("%v", err.Error()))
-			//	os.Exit(1)
-			//}
+			rootImageDestinationPath := os.ExpandEnv(filepath.Join(machineDirPath, machine.Hostname+RootImageFileSuffix))
+			rootImageSourcePath := os.ExpandEnv(machine.Image)
+			Logger.Debug("copy machine image file from root", "machine", machine, "root", rootImageSourcePath, "destination", rootImageDestinationPath)
+			if err := internal.CopyFile(rootImageSourcePath, rootImageDestinationPath, 0700); err != nil {
+				Logger.Error("Cannot copy machine root image file", "machine", machine.Hostname, "reason", fmt.Sprintf("%v", err.Error()))
+				os.Exit(1)
+			}
 
 			// using : https://github.com/dypflying/go-qcow2lib/blob/main/examples/backing/qcow2_backing.go
 			// use 'qemu-img info' to verify it
-			rootImageDestinationPath := os.ExpandEnv(filepath.Join(machineDirPath, machine.Hostname+RootImageFileSuffix))
+			//rootImageDestinationPath := os.ExpandEnv(filepath.Join(machineDirPath, machine.Hostname+RootImageFileSuffix))
 			Logger.Debug("create machine image overlay from root image", "machine", machine.Hostname, "parent", machineDirPath, "root", os.ExpandEnv(machine.Image))
 			overlayFile, err := createOverlayImage(&machine, rootImageDestinationPath, machineDirPath)
 			if err != nil {
@@ -113,11 +113,14 @@ var machineCreateCmd = &cobra.Command{
 
 			// create the machine in libvirt
 			if !dryRun {
-				// MUST precise the flag libvirt.DomainStartValidate to both define the domain from XML and start the domain with libvirt.
-				// DO NOT CHANGE THIS FLAG unless you know what you are doing !
-				_, err = LibvirtConnexion.DomainCreateXML(string(xmlMachineDescription), libvirt.DomainStartValidate)
+				domain, err := LibvirtConnexion.DomainDefineXML(string(xmlMachineDescription))
 				if err != nil {
-					Logger.Error("cannot create the machine from libvirt domain XML description", "machine", machine.Hostname, "reason", err)
+					Logger.Error("cannot define the machine from libvirt domain XML description", "machine", machine.Hostname, "reason", err)
+					os.Exit(1)
+				}
+				err = LibvirtConnexion.DomainCreate(domain)
+				if err != nil {
+					Logger.Error("cannot start the machine", "machine", machine.Hostname, "reason", err)
 					os.Exit(1)
 				}
 			} else {

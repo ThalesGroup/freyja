@@ -52,13 +52,14 @@ func (ci *CloudInitUserData) Build(machine *ConfigurationMachine) error {
 		ciu.Name = u.Name
 		ciu.Shell = CloudInitUserDataUserShellString
 		ciu.Passwd = u.Password
-		ciu.Groups = strings.Join(u.Groups, ",")
+
 		if u.Sudo {
 			// inject sudo list of parameters
 			ciu.Sudo = GetCloudInitUserDataUserSudoStringConst()
 			// inject sudo in groups
-			ciu.Groups = ciu.Groups + ",sudo"
+			u.Groups = append(u.Groups, "sudo")
 		}
+		ciu.Groups = strings.Join(u.Groups, ",")
 		// key content must be read and injected in cloud init user data
 		if u.Keys != nil {
 			keys := make([]string, len(u.Keys))
@@ -119,24 +120,31 @@ func (ci *CloudInitUserData) Build(machine *ConfigurationMachine) error {
 func (ci *CloudInitUserData) marshal() (data []byte, err error) {
 
 	// Convert the input to a YAML node
-	var node yaml.Node
-	if err = node.Encode(ci); err != nil {
+	var rootNode yaml.Node
+	if err = rootNode.Encode(ci); err != nil {
 		return nil, err
 	}
 
 	// Running through the yaml nodes to customize the output
 	// Root node
-	for i, subnode := range node.Content {
+	for i, node := range rootNode.Content {
 		// "users" map
-		if subnode.Value == "users" {
-			usersNode := node.Content[i+1]
+		if node.Value == "users" {
+			usersNode := rootNode.Content[i+1]
 			// for each user
 			for _, userNode := range usersNode.Content {
 				var passwdValueNode *yaml.Node
 				// for each config of a user
 				for j, userField := range userNode.Content {
 					// finding 'passwd' config
+					// apply double quote
 					if userField.Value == "passwd" {
+						passwdValueNode = userNode.Content[j+1]
+						passwdValueNode.Style = yaml.DoubleQuotedStyle
+					}
+					// finding 'groups' config
+					// apply double quote
+					if userField.Value == "groups" {
 						passwdValueNode = userNode.Content[j+1]
 						passwdValueNode.Style = yaml.DoubleQuotedStyle
 					}
@@ -146,7 +154,7 @@ func (ci *CloudInitUserData) marshal() (data []byte, err error) {
 	}
 
 	// Marshal the modified node back to YAML
-	return yaml.Marshal(&node)
+	return yaml.Marshal(&rootNode)
 }
 
 func (ci *CloudInitUserData) Write(directory string) (err error) {

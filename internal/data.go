@@ -672,7 +672,7 @@ type CloudInitUserDataUser struct {
 	Shell             string   `yaml:"shell"`          // default: /bin/bash
 	Passwd            string   `yaml:"passwd,flow"`
 	Groups            string   `yaml:"groups,omitempty"` // comma-separated string, ex: freyja, libvirt, sudo
-	SshAuthorizedKeys []string `yaml:"ssh_authorized_keys,omitempty"`
+	SshAuthorizedKeys []string `yaml:"ssh_authorized_keys,omitempty,flow"`
 }
 
 const CloudInitUserDataFilesEncoding = "base64"

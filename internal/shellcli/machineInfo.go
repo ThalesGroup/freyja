@@ -4,6 +4,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"freyja/internal"
+	"freyja/internal/configuration"
 	"github.com/digitalocean/go-libvirt"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
@@ -77,7 +78,7 @@ func init() {
 	}
 }
 
-func getDomainXMLDescription(domain libvirt.Domain) (*internal.XMLDomainDescription, error) {
+func getDomainXMLDescription(domain libvirt.Domain) (*configuration.XMLDomainDescription, error) {
 	// DOMAIN
 	domainName := domain.Name
 	// get domain xml description
@@ -87,7 +88,7 @@ func getDomainXMLDescription(domain libvirt.Domain) (*internal.XMLDomainDescript
 		return nil, err
 	}
 	// parse description to xml struct
-	var description internal.XMLDomainDescription
+	var description configuration.XMLDomainDescription
 	if err := xml.Unmarshal([]byte(domainDesc), &description); err != nil {
 		Logger.Error("Cannot unmarshal domain XML description", "domain", domainName)
 		return nil, err
@@ -119,7 +120,7 @@ func getDomainMacIP(domain libvirt.Domain, targetHostInterface string) (mac stri
 	return
 }
 
-func getDomainShortDescription(domain libvirt.Domain, description *internal.XMLDomainDescription) (*machineDescription, error) {
+func getDomainShortDescription(domain libvirt.Domain, description *configuration.XMLDomainDescription) (*machineDescription, error) {
 	// get networks info from xml struct
 	var interfaces []machineInterface
 	for _, ifaceData := range description.Devices.Interfaces {

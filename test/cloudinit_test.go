@@ -5,6 +5,7 @@ import (
 	"embed"
 	"errors"
 	"freyja/internal"
+	"freyja/internal/configuration"
 	"os"
 	"path/filepath"
 	"testing"
@@ -317,14 +318,14 @@ func testGeneratedDefaultCloudInitConfigs(t *testing.T, testDirName string, conf
 	var err error
 	for _, machine := range config.Machines {
 		testDir := filepath.Join(getCloudInitTestDirPath(), testDirName, machine.Hostname)
-		if err = internal.GenerateCloudInitConfigs(&machine, testDir); err != nil {
+		if err = configuration.GenerateCloudInitConfigs(&machine, testDir); err != nil {
 			t.Errorf("cannot generate cloud init configs for machine '%s', reason: %v", machine.Hostname, err)
 			t.FailNow()
 		}
 
 		// test if files have been created
-		resultMetadataFilePath := filepath.Join(testDir, internal.CloudInitMetadataFileName)
-		resultUserdataFilePath := filepath.Join(testDir, internal.CloudInitUserDataFileName)
+		resultMetadataFilePath := filepath.Join(testDir, configuration.CloudInitMetadataFileName)
+		resultUserdataFilePath := filepath.Join(testDir, configuration.CloudInitUserDataFileName)
 		if _, err = os.Stat(resultMetadataFilePath); errors.Is(err, os.ErrNotExist) {
 			t.Errorf("cloud init metadata file not found in '%s'", testDir)
 			t.FailNow()

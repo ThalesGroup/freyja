@@ -1,7 +1,8 @@
-package internal
+package configuration
 
 import (
 	"fmt"
+	"freyja/internal"
 	"github.com/kdomanski/iso9660"
 	"gopkg.in/yaml.v3"
 	"os"
@@ -11,8 +12,152 @@ import (
 
 const ISOCloudInitFileSuffix string = "-cloud-init.iso"
 
+// **********
+// DATA MODEL
+// **********
+
+// CloudInitMetadata is the user metadata configuration specifications
+type CloudInitMetadata struct {
+	InstanceID    string `yaml:"instance"`       // = machine hostname
+	LocalHostname string `yaml:"local-hostname"` // = machine hostname
+}
+
+// CloudInitUserData is the user configuration specification with cloud-init specifications.
+// The format used here is YAML.
+// This format is mandatory to generate the ISO9660 disk image file for machine provisioning.
+// Compliant with cloud-init version 24.2
+// Example from https://cloudinit.readthedocs.io/en/latest/reference/examples.html :
+// Specs from https://cloudinit.readthedocs.io/en/latest/reference/modules.html
+//
+// #cloud-config
+// hostname: debian12
+// output:
+//
+//	all: ">> /var/log/cloud-init.log"
+//
+// users:
+//   - name: "freyja"
+//     sudo: [ 'ALL=(ALL) NOPASSWD:ALL' ]
+//     lock_passwd: false
+//     shell: /bin/bash
+//     passwd: "$6$GM./aNJikL/g$AR2c35i1QIaimKo/zOC/1Qg2JO65ysPPjv/leWBcgBXaxNV3V8IcgJVeTzt4VHWzcja66zsBnR1iyYtO2DPme/"
+//     groups: sudo
+//     ssh_authorized_keys:
+//   - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILISxfJd/91TY9DH97/Y6t2zejV8p0x7L4Ygjy45iMPp kaio@kaio-host
+//
+// ssh_authorized_keys:
+//   - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILISxfJd/91TY9DH97/Y6t2zejV8p0x7L4Ygjy45iMPp kaio@kaio-host
+//
+// package_update: False
+// package_upgrade: False
+// packages:
+//   - vim
+//   - git
+//
+// write_files:
+//   - content: aGVsbG8gd29ybGQhCg==
+//     encoding: base64
+//     path: /home/freyja/hello.txt
+//     permissions: 0760
+//     owner: freyja:freyja
+//
+// runcmd:
+//   - systemctl stop network && systemctl start network
+//
+// # if reboot needed
+// power_state:
+//
+//	mode: reboot
+//	message: First reboot
+//	timeout: 30
+//	condition: True
+type CloudInitUserData struct {
+	Hostname       string                       `yaml:"hostname"` // MANDATORY
+	Output         *CloudInitUserDataOutput     `yaml:"output"`
+	Users          []CloudInitUserDataUser      `yaml:"users"`                 // MANDATORY ??
+	PackageUpdate  bool                         `yaml:"package_update"`        // default : false
+	PackageUpgrade bool                         `yaml:"package_upgrade"`       // default : false
+	Packages       []string                     `yaml:"packages,omitempty"`    // default: empty
+	WriteFiles     []CloudInitUserDataFiles     `yaml:"write_files,omitempty"` // default: empty
+	RunCmd         []string                     `yaml:"runcmd,omitempty"`      // default: empty
+	PowerState     *CloudInitUserDataPowerState `yaml:"power_state,omitempty"` // default: nil
+}
+
+const CloudInitUserDataHeader string = "#cloud-config\n"
+
+const CloudInitUserDataOutputAllString = ">> /var/log/cloud-init.log"
+
+type CloudInitUserDataOutput struct {
+	All string `yaml:"all"`
+}
+
+const CloudInitUserDataUserSudoString string = "ALL=(ALL) NOPASSWD:ALL"
+
+func GetCloudInitUserDataUserSudoStringConst() []string {
+	return []string{CloudInitUserDataUserSudoString}
+}
+
+const CloudInitUserDataUserShellString = "/bin/bash"
+
+// CloudInitUserDataUser
+// name: "freyja"
+// sudo: [ 'ALL=(ALL) NOPASSWD:ALL' ]
+// lock_passwd: false
+// shell: /bin/bash
+// passwd: "$6$GM./aNJikL/g$AR2c35i1QIaimKo/zOC/1Qg2JO65ysPPjv/leWBcgBXaxNV3V8IcgJVeTzt4VHWzcja66zsBnR1iyYtO2DPme/"
+// groups: sudo
+// ssh_authorized_keys:
+// - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILISxfJd/91TY9DH97/Y6t2zejV8p0x7L4Ygjy45iMPp kaio@kaio-host
+type CloudInitUserDataUser struct {
+	Name              string   `yaml:"name"`           // MANDATORY
+	Sudo              []string `yaml:"sudo,omitempty"` // example if sudo : [ 'ALL=(ALL) NOPASSWD:ALL' ]
+	LockPasswd        bool     `yaml:"lock_passwd"`    // default: false
+	Shell             string   `yaml:"shell"`          // default: /bin/bash
+	Passwd            string   `yaml:"passwd,flow"`
+	Groups            string   `yaml:"groups,omitempty"` // comma-separated string, ex: freyja, libvirt, sudo
+	SshAuthorizedKeys []string `yaml:"ssh_authorized_keys,omitempty,flow"`
+}
+
+const CloudInitUserDataFilesEncoding = "base64"
+
+// CloudInitUserDataFiles
+// content: aGVsbG8gd29ybGQhCg==
+// encoding: base64
+// path: /home/freyja/hello.txt
+// permissions: 0760
+// owner: freyja:freyja
+type CloudInitUserDataFiles struct {
+	Content     string `yaml:"content"`
+	Encoding    string `yaml:"encoding"` // = base64
+	Path        string `yaml:"path"`
+	Permissions string `yaml:"permissions,omitempty"`
+	Owner       string `yaml:"owner,omitempty"`
+}
+
+const CloudInitUserPowerStateMode string = "reboot"
+const CloudInitUserPowerStateMessage string = "First reboot"
+const CloudInitUserPowerStateTimeout = uint(30)
+const CloudInitUserPowerStateCondition bool = true
+
+// CloudInitUserDataPowerState if reboot is needed. all are default values
+//
+//	mode: reboot
+//	message: First reboot
+//	timeout: 30
+//	condition: True
+type CloudInitUserDataPowerState struct {
+	Mode      string `yaml:"mode"`      // = reboot
+	Message   string `yaml:"message"`   // = First reboot
+	Timeout   uint   `yaml:"timeout"`   // = 30 (seconds)
+	Condition bool   `yaml:"condition"` // = True
+}
+
+// **************
+// IMPLEMENTATION
+// **************
+
 type CloudInitConfiguration interface {
-	Build(machine *ConfigurationMachine) error
+	Build(machine *FreyjaConfigurationMachine) error
 	Write(directory string) error
 }
 
@@ -20,7 +165,7 @@ const CloudInitMetadataFileName = "meta-data"
 
 const CloudInitUserDataFileName = "user-data"
 
-func (ci *CloudInitMetadata) Build(machine *ConfigurationMachine) error {
+func (ci *CloudInitMetadata) Build(machine *FreyjaConfigurationMachine) error {
 	ci.InstanceID = machine.Hostname
 	ci.LocalHostname = machine.Hostname
 	return nil
@@ -37,7 +182,7 @@ func (ci *CloudInitMetadata) Write(directory string) (err error) {
 // USER DATA
 
 // Build generate the configuration from a file
-func (ci *CloudInitUserData) Build(machine *ConfigurationMachine) error {
+func (ci *CloudInitUserData) Build(machine *FreyjaConfigurationMachine) error {
 	// set cloud-init values according to configuration inputs
 	// hostname
 	ci.Hostname = machine.Hostname
@@ -92,7 +237,7 @@ func (ci *CloudInitUserData) Build(machine *ConfigurationMachine) error {
 		if err != nil {
 			return err
 		}
-		cif.Content = EncodeB64Bytes(contentBytes)
+		cif.Content = internal.EncodeB64Bytes(contentBytes)
 		// path
 		cif.Path = f.Destination
 		cif.Permissions = f.Permissions
@@ -180,7 +325,7 @@ func writeCloudInitConfig(directory string, filename string, data []byte) (err e
 	}
 	// re-create the file to inject data
 	path := filepath.Join(directory, filename)
-	_, err = RemoveIfExists(path)
+	_, err = internal.RemoveIfExists(path)
 	if err != nil {
 		return fmt.Errorf("could not remove file '%s': %w", path, err)
 	}
@@ -199,7 +344,7 @@ func writeCloudInitConfig(directory string, filename string, data []byte) (err e
 	return nil
 }
 
-func GenerateCloudInitConfigs(machine *ConfigurationMachine, outputDir string) error {
+func GenerateCloudInitConfigs(machine *FreyjaConfigurationMachine, outputDir string) error {
 	// metadata generation
 	var cm CloudInitMetadata
 	if err := cm.Build(machine); err != nil {
@@ -232,7 +377,7 @@ func GenerateCloudInitConfigs(machine *ConfigurationMachine, outputDir string) e
 // it is also used in terraform for proxmox : https://github.com/Telmate/terraform-provider-proxmox/blob/186ec3f23bf4a62fcad35f6292fa1350b8e1183b/proxmox/resource_cloud_init_disk.go#L77-L122
 // YOU MUST name the provision files 'user-data' 'meta-data' !!!!!!!!
 // YOU MUST name the ISO volume 'cidata' !!!!!!
-func CreateCloudInitIso(machine *ConfigurationMachine, machineDir string) (string, error) {
+func CreateCloudInitIso(machine *FreyjaConfigurationMachine, machineDir string) (string, error) {
 	isoWriter, err := iso9660.NewWriter()
 	if err != nil {
 		return "", fmt.Errorf("cannot create the iso9660 writer for the machine '%s' : %w", machine.Hostname, err)
@@ -263,7 +408,7 @@ func CreateCloudInitIso(machine *ConfigurationMachine, machineDir string) (strin
 
 	// write iso on filesystem
 	isoOutputPath := filepath.Join(machineDir, fmt.Sprintf("%s%s", machine.Hostname, ISOCloudInitFileSuffix))
-	_, err = RemoveIfExists(isoOutputPath)
+	_, err = internal.RemoveIfExists(isoOutputPath)
 	if err != nil {
 		return "", fmt.Errorf("cannot replace the cloud init ISO file in '%s' : %w", isoOutputPath, err)
 	}

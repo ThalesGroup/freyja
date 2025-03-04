@@ -1,13 +1,9 @@
 package shellcli
 
 import (
-	"crypto/sha256"
-	b64 "encoding/base64"
-	"encoding/xml"
 	"fmt"
-	"freyja/internal"
+	"freyja/internal/configuration"
 	"github.com/dypflying/go-qcow2lib/qcow2"
-	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
@@ -39,14 +35,14 @@ var machineCreateCmd = &cobra.Command{
 		//   - test with multiple ssh keys
 		//   - create the network if it does not already exists
 		// build config from path
-		var configurationData internal.ConfigurationData
-		if err := configurationData.BuildFromFile(configurationPath); err != nil {
+		var freyjaConfiguration configuration.FreyjaConfiguration
+		if err := freyjaConfiguration.BuildFromFile(configurationPath); err != nil {
 			Logger.Error("cannot parse configuration", "configuration", configurationPath, "reason", err.Error())
 			os.Exit(1)
 		}
 		// build cloud init config file
 		//var cloudInitData internal.CloudInitUserData
-		for _, machine := range configurationData.Machines {
+		for _, machine := range freyjaConfiguration.Machines {
 			Logger.Info("create", "machine", machine.Hostname)
 
 			// create machine directory
@@ -61,14 +57,14 @@ var machineCreateCmd = &cobra.Command{
 			// YOU MUST name the provision files 'user-data' 'meta-data' !!!!!!!!
 			// YOU MUST name the ISO volume 'cidata' !!!!!!
 			Logger.Debug("create cloud init user-data and meta-data", "machine", machine.Hostname, "parent", machineDirPath)
-			if err := internal.GenerateCloudInitConfigs(&machine, machineDirPath); err != nil {
+			if err := configuration.GenerateCloudInitConfigs(&machine, machineDirPath); err != nil {
 				Logger.Error("cannot create machine cloud init configurations", "machine", machine.Hostname, "reason", err.Error())
 				os.Exit(1)
 			}
 
 			// create cloud-init iso file
 			Logger.Debug("create cloud ISO file", "machine", machine.Hostname, "parent", machineDirPath)
-			cloudInitIsoFile, err := internal.CreateCloudInitIso(&machine, machineDirPath)
+			cloudInitIsoFile, err := configuration.CreateCloudInitIso(&machine, machineDirPath)
 			if err != nil {
 				Logger.Error("Cannot create machine ISO image file", "machine", machine.Hostname, "reason", err.Error())
 				os.Exit(1)
@@ -99,7 +95,7 @@ var machineCreateCmd = &cobra.Command{
 			// also injects the overlay image file for qemu
 			// also injects the cloud init files for startup sequence
 			Logger.Debug("create machine's XML libvirt description", "machine", machine.Hostname, "parent", machineDirPath)
-			xmlMachineDescription, err := createLibvirtDomainXMLDescription(&machine, overlayFile, cloudInitIsoFile)
+			xmlMachineDescription, err := configuration.CreateLibvirtDomainXMLDescription(&machine, overlayFile, cloudInitIsoFile)
 			if err != nil {
 				Logger.Error("cannot create the libvirt domain XML description from machine configuration", "machine", machine.Hostname, "reason", fmt.Sprintf("%v", err))
 				os.Exit(1)
@@ -142,7 +138,7 @@ func init() {
 }
 
 // getMachineDirByConf builds the machine directory path from its configuration
-func getMachineDirByConf(machine *internal.ConfigurationMachine) string {
+func getMachineDirByConf(machine *configuration.FreyjaConfigurationMachine) string {
 	return filepath.Join(FreyjaMachinesWorkspaceDir, machine.Hostname)
 }
 
@@ -152,7 +148,7 @@ func getMachineDirByName(machineName string) string {
 }
 
 // createMachineDir returns the created dir, or an error
-func createMachineDir(machine *internal.ConfigurationMachine) (string, error) {
+func createMachineDir(machine *configuration.FreyjaConfigurationMachine) (string, error) {
 	machineDirPath := getMachineDirByConf(machine)
 	if _, err := os.Stat(machineDirPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(machineDirPath, os.ModePerm); err != nil {
@@ -162,7 +158,7 @@ func createMachineDir(machine *internal.ConfigurationMachine) (string, error) {
 	return machineDirPath, nil
 }
 
-func createOverlayImage(machine *internal.ConfigurationMachine, rootImagePath string, machineDir string) (string, error) {
+func createOverlayImage(machine *configuration.FreyjaConfigurationMachine, rootImagePath string, machineDir string) (string, error) {
 	// using : https://github.com/dypflying/go-qcow2lib/blob/main/examples/backing/qcow2_backing.go
 	opts := make(map[string]any)
 	backingFile, err := filepath.Abs(rootImagePath)
@@ -179,189 +175,4 @@ func createOverlayImage(machine *internal.ConfigurationMachine, rootImagePath st
 	}
 
 	return overlayFile, nil
-}
-
-func createLibvirtDomainXMLDescription(cm *internal.ConfigurationMachine, overlayFile string, cloudInitIsoFile string) ([]byte, error) {
-	// TODO: how to generate the unique id ?
-	//  - use '1', '2', ... and store the existing ids in metadata to make sure to not reuse an existing one ?
-	//  - use a uuid ?
-	//  - use a hash of the hostname ? -> choice 1
-	mName := cm.Hostname
-	// ID is the fnv hash of the machine hostname
-	mUUID, err := generateMachineUUID(mName)
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate machine UUID: %w", err)
-	}
-	// memory
-	mMemory := internal.XMLDomainDescriptionMemory{
-		Unit:  string(internal.MiBMemoryUnit),
-		Value: uint64(cm.Memory),
-	}
-	// cpu
-	//mVcpu := cm.Vcpu
-	mVcpu := internal.XMLDomainDescriptionVcpu{
-		Placement: string(internal.StaticVcpuPlacement),
-		Value:     uint64(cm.Vcpu),
-	}
-	// OS description
-	Arch := string(internal.X86OSArch)
-	mOSType := internal.XMLDomainDescriptionOSType{
-		Type: internal.DefaultOsType,
-		Arch: Arch,
-	}
-	mOSBoot := internal.XMLDomainDescriptionOSBoot{
-		Dev: string(internal.HdOsBootDev),
-	}
-	mOS := internal.XMLDomainDescriptionOS{
-		Type: &mOSType,
-		Boot: &mOSBoot,
-	}
-	// metadata
-	// TODO : find a way to get the proper os type from golang
-	//  for now, no metadata for os info part
-
-	// live image device
-	//        <disk type="file" device="disk">
-	//            <driver name="qemu" type="qcow2"/>
-	//            <source file="/home/kaio/Projects/thales/freyja/test/manual/debian-12-generic-amd64.qcow2"/>
-	//            <target dev="hda" bus="ide"/>
-	//        </disk>
-	//        <disk type="file" device="cdrom">
-	//            <driver name="qemu" type="raw"/>
-	//            <source file="/home/kaio/Projects/thales/freyja/test/manual/debian12-cloud-init.iso"/>
-	//            <target dev="hdb" bus="ide"/>
-	//            <readonly/>
-	//        </disk>
-	liveImageDevice := internal.XMLDomainDescriptionDevicesDisk{
-		Device: string(internal.DiskDeviceType),
-		Type:   string(internal.FileDeviceDiskType),
-		Driver: &internal.XMLDomainDescriptionDevicesDiskDriver{
-			Name: string(internal.QemuDeviceDiskDriverName),
-			Type: string(internal.QcowDeviceDiskDriverType),
-		},
-		Source: &internal.XMLDomainDescriptionDevicesDiskSource{
-			File: overlayFile,
-		},
-		BackingStore: &internal.XMLDomainDescriptionDevicesDiskBackingStore{
-			Type: string(internal.FileDeviceDiskType),
-			Format: &internal.XMLDomainDescriptionDevicesDiskBackingStoreFormat{
-				Type: string(internal.QcowDeviceDiskDriverType),
-			},
-			Source: &internal.XMLDomainDescriptionDevicesDiskBackingStoreSource{
-				//File: overlayFile,
-				File: os.ExpandEnv(cm.Image),
-			},
-		},
-		Target: &internal.XMLDomainDescriptionDevicesDiskTarget{
-			// Only works for 'ide' bus type
-			Bus:    string(internal.IdeDeviceDiskTargetBus),
-			Device: string(internal.HdaDeviceDiskTargetDev),
-		},
-	}
-
-	// cloud init raw iso device
-	//	    <disk device="cdrom" type="file">
-	//	        <driver name="qemu" type="raw"/>
-	//	        <source file="/home/kaio/freyja-workspace/build/debian12/debian12_cloud_init.iso" index="1"/>
-	//	        <backingStore/>
-	//	        <target bus="sata" dev="sda"/>
-	//	        <readonly/>
-	//	        <alias name="sata0-0-0"/>
-	//	        <address bus="0" controller="0" target="0" type="drive" unit="0"/>
-	//	    </disk>
-	cloudInitIsoDevice := internal.XMLDomainDescriptionDevicesDisk{
-		Device: string(internal.CdromDeviceType),
-		Type:   string(internal.FileDeviceDiskType),
-		Driver: &internal.XMLDomainDescriptionDevicesDiskDriver{
-			Name: string(internal.QemuDeviceDiskDriverName),
-			Type: string(internal.RawDeviceDiskDriverType),
-		},
-		Source: &internal.XMLDomainDescriptionDevicesDiskSource{
-			File: cloudInitIsoFile,
-		},
-		Target: &internal.XMLDomainDescriptionDevicesDiskTarget{
-			// Only works for 'ide' bus type
-			Bus:    string(internal.IdeDeviceDiskTargetBus),
-			Device: string(internal.HdbDeviceDiskTargetDev),
-		},
-	}
-
-	// network device
-	//        <interface type="network">
-	//            <mac address="52:54:00:17:49:b7"/>
-	//            <source network="default"/>
-	//        </interface>
-	var bridgeInterfaceDevices []internal.XMLDomainDescriptionDevicesInterface
-	if len(cm.Networks) > 0 {
-		// user defined networks
-		bridgeInterfaceDevices = make([]internal.XMLDomainDescriptionDevicesInterface, len(cm.Networks))
-		for _, network := range cm.Networks {
-			// TODO :
-			//  - add the possibility to provide the host's target interface
-			bridgeInterfaceDevice := internal.XMLDomainDescriptionDevicesInterface{
-				Type: string(internal.NetworkDeviceInterfaceType),
-				Mac: &internal.XMLDomainDescriptionDevicesInterfaceMac{
-					Address: network.Mac,
-				},
-				Source: &internal.XMLDomainDescriptionDevicesInterfaceSource{
-					Bridge:  internal.DefaultInterfaceSourceBridge,
-					Network: network.Name,
-				},
-				//Target: internal.XMLDomainDescriptionDevicesInterfaceTarget{}, // provide if user conf specifies a host interface
-				Target: nil,
-				Model: &internal.XMLDomainDescriptionDevicesInterfaceModel{
-					Type: internal.DefaultInterfaceModelType,
-				},
-			}
-			bridgeInterfaceDevices = append(bridgeInterfaceDevices, bridgeInterfaceDevice)
-		}
-	} else {
-		// if no network define in user conf input, stick with the default one
-		bridgeInterfaceDevices = []internal.XMLDomainDescriptionDevicesInterface{internal.DefaultDeviceInterface}
-	}
-
-	// console device for graphical debug
-	//	        <console type='pty'>
-	//	          <target type='serial' port='0'/>
-	//	        </console>
-	consoleDevice := internal.XMLDomainDescriptionDevicesConsole{
-		Type: string(internal.PtyDeviceConsoleType),
-		Target: &internal.XMLDomainDescriptionDevicesConsoleTarget{
-			Type: string(internal.SerialDeviceConsoleTargetType),
-		},
-	}
-
-	// xml
-	deviceDisks := []internal.XMLDomainDescriptionDevicesDisk{liveImageDevice, cloudInitIsoDevice}
-	xmlDescription := internal.XMLDomainDescription{
-		Type:   internal.DefaultDomainType,
-		Name:   mName,
-		UUID:   mUUID,
-		Vcpu:   &mVcpu,
-		Memory: &mMemory,
-		OS:     &mOS,
-		Devices: &internal.XMLDomainDescriptionDevices{
-			Emulator:   string(internal.QemuX86DevicesEmulator),
-			Disks:      deviceDisks,
-			Interfaces: bridgeInterfaceDevices,
-			Console:    []internal.XMLDomainDescriptionDevicesConsole{consoleDevice},
-		},
-	}
-	return xml.Marshal(xmlDescription)
-}
-
-func generateMachineUUID(machineName string) (string, error) {
-	h := sha256.New()
-	_, err := h.Write([]byte(machineName))
-	if err != nil {
-		return "", fmt.Errorf("cannot generate a hash based on the machine hostname '%s': %w", machineName, err)
-	}
-	sum := h.Sum(nil)
-	mID := b64.StdEncoding.EncodeToString(sum)[:16]
-	// UUID is generated from the ID
-	mUUIDRaw, err := uuid.FromBytes(sum[:16])
-	if err != nil {
-		return "", fmt.Errorf("cannot create machine UUID based on its ID '%s': %w", mID, err)
-	}
-	return fmt.Sprintf("%v", mUUIDRaw), nil
 }

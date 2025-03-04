@@ -3,7 +3,7 @@ package shellcli
 import (
 	"encoding/xml"
 	"fmt"
-	"freyja/internal"
+	"freyja/internal/configuration"
 	"github.com/digitalocean/go-libvirt"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
@@ -77,7 +77,7 @@ func getNetworkDescription(networkName string) (netDesc *NetworkDescription, err
 		Logger.Error("Cannot get network XML description", "network", network.Name)
 		return nil, err
 	}
-	var description internal.XMLNetworkDescription
+	var description configuration.XMLNetworkDescription
 	err = xml.Unmarshal([]byte(xmlDescription), &description)
 	if err != nil {
 		Logger.Error("Cannot unmarshal domain XML description", "domain", infoNetworkName)

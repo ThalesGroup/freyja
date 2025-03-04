@@ -7,7 +7,7 @@ machines:
     networks: # MANDATORY, at least one
       - name: "ctrl-plane"
         mac: "52:54:02:aa:bb:cc"
-        interface: "vnet0"
+        interface: "virbr0"
       - name: "data-plane"
         mac: "52:54:02:aa:bb:cd"
     users: # MANDATORY
@@ -19,7 +19,7 @@ machines:
           - "/tmp/freyja-unit-test/config/ext.pub"
         groups: ["group1", "group2"]
       - name: "frodo" # MANDATORY
-        password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # MANDATORY, here 'master'ub"
+        password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # MANDATORY, here 'master'
     storage: 100 # Optional, default '30'
     memory: 8192 # Optional, default '4096'
     vcpu: 4 # Optional, default '2'

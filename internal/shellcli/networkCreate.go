@@ -3,6 +3,7 @@ package shellcli
 import (
 	"encoding/xml"
 	"freyja/internal"
+	"freyja/internal/configuration"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
@@ -75,14 +76,14 @@ func init() {
 //
 //	to create a network with existing routed interfaces on host :
 //	https://libvirt.org/formatnetwork.html#routed-network-config
-func NetworkCreateConfig(networkName string) internal.XMLNetworkDescription {
-	configForward := internal.XMLNetworkDescriptionForward{
+func NetworkCreateConfig(networkName string) configuration.XMLNetworkDescription {
+	configForward := configuration.XMLNetworkDescriptionForward{
 		Mode: "bridge",
 	}
-	configBridge := internal.XMLNetworkDescriptionBridge{
+	configBridge := configuration.XMLNetworkDescriptionBridge{
 		Name: "virbr0",
 	}
-	return internal.XMLNetworkDescription{
+	return configuration.XMLNetworkDescription{
 		Name:    networkName,
 		UUID:    internal.GenerateUUID(),
 		Forward: &configForward,

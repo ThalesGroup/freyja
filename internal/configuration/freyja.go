@@ -1,13 +1,111 @@
-package internal
+package configuration
 
 import (
 	"errors"
 	"fmt"
+	"freyja/internal"
 	"github.com/spf13/viper"
 	"log"
 	"path/filepath"
 	"regexp"
 )
+
+// DefaultUserName = freyja
+const DefaultUserName string = "freyja"
+
+// DefaultUserPassword = master
+const DefaultUserPassword string = "$6$GM./aNJikL/g$AR2c35i1QIaimKo/zOC/1Qg2JO65ysPPjv/leWBcgBXaxNV3V8IcgJVeTzt4VHWzcja66zsBnR1iyYtO2DPme/"
+
+// DefaultMachineStorage = 20 GiB
+const DefaultMachineStorage uint = 20
+
+// DefaultMachineMemory = 4096 MiB
+const DefaultMachineMemory uint = 4096
+
+// DefaultMachineVcpu = 1 vcpu
+const DefaultMachineVcpu uint = 1
+
+// FreyjaConfiguration is the base model for freyja configuration parameters
+// Example :
+// ---
+// version: v0.1.0-beta
+// machines:
+//   - image: "/tmp/CentOS-Stream-GenericCloud-8-20210603.0.x86_64.qcow2" # MANDATORY
+//     os: "centos8" # MANDATORY
+//     hostname: "vm1" # MANDATORY, MUST NOT contain underscores
+//     networks: # MANDATORY, at least one
+//   - name: "ctrl-plane"
+//     mac: "52:54:02:aa:bb:cc"
+//     interface: "vnet0"
+//   - name: "data-plane"
+//     mac: "52:54:02:aa:bb:cd"
+//     users: # MANDATORY
+//   - name: "sam" # MANDATORY
+//     password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # MANDATORY, here 'master'
+//     keys: # Optional, default '$HOME/.ssh/id_rsa.pub'
+//   - "/tmp/freyja-unit-test/config/sam.pub"
+//   - "/tmp/freyja-unit-test/config/ext.pub"
+//     groups: ["sudo", "freyja"]
+//   - name: "frodo" # MANDATORY
+//     password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # MANDATORY, here 'master'ub"
+//     storage: 100 # Optional, default '30'
+//     memory: 8192 # Optional, default '4096'
+//     vcpu: 4 # Optional, default '2'
+//     packages: [ "curl", "net-tools" ]
+//     cmd:
+//   - "echo 'hello world !' > /tmp/test.txt"
+//   - "cat /tmp/test.txt"
+//     files:
+//   - source: "/tmp/freyja-unit-test/config/hello.txt"
+//     destination: "/root/hello.txt"
+//     permissions : "0700"
+//     owner: "root:freyja"
+//   - source: "/tmp/freyja-unit-test/config/world.txt"
+//     destination: "/home/sam/world.txt"
+type FreyjaConfiguration struct {
+	Version  string                       `yaml:"version"`
+	Machines []FreyjaConfigurationMachine `yaml:"machines"`
+}
+
+// FreyjaConfigurationMachine is the configuration model for libvirt guest parameters
+type FreyjaConfigurationMachine struct {
+	// MANDATORY
+	Image    string `yaml:"image"`    // Qcow2 image file path on host
+	Os       string `yaml:"os"`       // os type in libosinfo
+	Hostname string `yaml:"hostname"` // domain name in libvirt
+	// optional
+	Networks []FreyjaConfigurationNetwork `yaml:"networks"`
+	Users    []FreyjaConfigurationUser    `yaml:"users"`
+	Storage  uint                         `yaml:"storage"` // GiB
+	Memory   uint                         `yaml:"memory"`  // MiB
+	Vcpu     uint                         `yaml:"vcpu"`
+	Packages []string                     `yaml:"packages"`
+	Cmd      []string                     `yaml:"cmd"`
+	Files    []FreyjaConfigurationFile    `yaml:"files"`
+	Update   bool                         `yaml:"update"`
+	Reboot   bool                         `yaml:"reboot"`
+}
+
+type FreyjaConfigurationNetwork struct {
+	Name      string `yaml:"name"`
+	Mac       string `yaml:"mac"`
+	Interface string `yaml:"interface"`
+}
+
+type FreyjaConfigurationUser struct {
+	Name     string   `yaml:"name"`
+	Password string   `yaml:"password"`
+	Sudo     bool     `yaml:"sudo"`
+	Groups   []string `yaml:"groups"`
+	Keys     []string `yaml:"keys"`
+}
+
+type FreyjaConfigurationFile struct {
+	Source      string `yaml:"source"`
+	Destination string `yaml:"destination"`
+	Permissions string `yaml:"permissions"`
+	Owner       string `yaml:"owner"`
+}
 
 type Configuration interface {
 	Validate() error
@@ -16,7 +114,7 @@ type Configuration interface {
 
 // Validate audits the whole freyja configuration for content mistakes
 // mistake = configuration value that may cause further issues during machine creation in libvirt
-func (c *ConfigurationData) Validate() error {
+func (c *FreyjaConfiguration) Validate() error {
 	// verify version
 	err := c.validateVersion()
 	if err != nil {
@@ -32,21 +130,21 @@ func (c *ConfigurationData) Validate() error {
 			for _, network := range machine.Networks {
 				err = network.validateNetwork()
 				if err != nil {
-					return &ConfigurationError{Message: err.Error()}
+					return &internal.ConfigurationError{Message: err.Error()}
 				}
 			}
 			// verify users
 			for _, user := range machine.Users {
 				err = user.validateUser()
 				if err != nil {
-					return &ConfigurationError{Message: err.Error()}
+					return &internal.ConfigurationError{Message: err.Error()}
 				}
 			}
 			// verify files
 			for _, file := range machine.Files {
 				err = file.validateFiles()
 				if err != nil {
-					return &ConfigurationError{Message: err.Error()}
+					return &internal.ConfigurationError{Message: err.Error()}
 				}
 			}
 		}
@@ -55,7 +153,7 @@ func (c *ConfigurationData) Validate() error {
 }
 
 // ValidateVersion audits the version configuration
-func (c *ConfigurationData) validateVersion() error {
+func (c *FreyjaConfiguration) validateVersion() error {
 	if c.Version == "" {
 		return errors.New("missing version value")
 	}
@@ -73,7 +171,7 @@ func (c *ConfigurationData) validateVersion() error {
 // ValidateNetwork audits the network configuration including
 //   - the name of the network
 //   - the format of the mac address
-func (cn *ConfigurationNetwork) validateNetwork() error {
+func (cn *FreyjaConfigurationNetwork) validateNetwork() error {
 	if cn.Name == "" {
 		return errors.New("network name is empty")
 	}
@@ -90,11 +188,11 @@ func (cn *ConfigurationNetwork) validateNetwork() error {
 
 // ValidateUser audits the user configuration including
 //   - the path of the keys on the host
-func (cu *ConfigurationUser) validateUser() error {
+func (cu *FreyjaConfigurationUser) validateUser() error {
 	if len(cu.Keys) > 0 {
 		for _, key := range cu.Keys {
 			// check if the key path's file exists
-			if !FileExists(key) {
+			if !internal.FileExists(key) {
 				return fmt.Errorf("user key file '%s' does not exists", key)
 			}
 		}
@@ -102,9 +200,9 @@ func (cu *ConfigurationUser) validateUser() error {
 	return nil
 }
 
-func (cf *ConfigurationFile) validateFiles() error {
+func (cf *FreyjaConfigurationFile) validateFiles() error {
 	// validate source
-	if !FileExists(cf.Source) {
+	if !internal.FileExists(cf.Source) {
 		return errors.New(fmt.Sprintf("configuration not found : '%s' does not exist", cf.Source))
 	}
 	// validate permissions
@@ -133,7 +231,7 @@ func (cf *ConfigurationFile) validateFiles() error {
 }
 
 // BuildFromFile generate the configuration from a file
-func (c *ConfigurationData) BuildFromFile(path string) error {
+func (c *FreyjaConfiguration) BuildFromFile(path string) error {
 	viper.SetConfigType("yaml")
 	// load file
 	absPath, err := filepath.Abs(path)
@@ -165,12 +263,12 @@ func (c *ConfigurationData) BuildFromFile(path string) error {
 
 // setDefaultValues set values to parameters that have not been configured but are still required
 // for libvirt
-func (c *ConfigurationData) setDefaultValues() {
+func (c *FreyjaConfiguration) setDefaultValues() {
 	for i, machine := range c.Machines {
 		// default user
 		if len(machine.Users) == 0 {
-			users := make([]ConfigurationUser, 1)
-			users[0] = ConfigurationUser{
+			users := make([]FreyjaConfigurationUser, 1)
+			users[0] = FreyjaConfigurationUser{
 				Name:     DefaultUserName,
 				Password: DefaultUserPassword,
 			}
@@ -215,11 +313,11 @@ func (c *ConfigurationData) setDefaultValues() {
 	}
 }
 
-func (c *ConfigurationData) setUsers() {
-	//machines := make([]ConfigurationMachine, len(c.Machines))
+func (c *FreyjaConfiguration) setUsers() {
+	//machines := make([]FreyjaConfigurationMachine, len(c.Machines))
 	for i, machine := range c.Machines {
-		users := make([]ConfigurationUser, 1)
-		users[0] = ConfigurationUser{
+		users := make([]FreyjaConfigurationUser, 1)
+		users[0] = FreyjaConfigurationUser{
 			Name:     DefaultUserName,
 			Password: DefaultUserPassword,
 		}

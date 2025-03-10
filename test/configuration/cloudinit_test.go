@@ -1,4 +1,4 @@
-package internal
+package configuration
 
 import (
 	"bytes"
@@ -6,6 +6,7 @@ import (
 	"errors"
 	"freyja/internal"
 	"freyja/internal/configuration"
+	internalTest "freyja/test"
 	"os"
 	"path/filepath"
 	"testing"
@@ -38,7 +39,7 @@ const cloudInitTestDirname = "cloudinit"
 // config data model, is valid
 func TestBuildMetadataCloudInitConfig(t *testing.T) {
 	c := BuildCompleteConfig()
-	var ci internal.CloudInitMetadata
+	var ci configuration.CloudInitMetadata
 	// test for second machine
 	// get only the minimum required for machine config
 	m := &c.Machines[1]
@@ -65,7 +66,7 @@ func TestBuildMetadataCloudInitConfig(t *testing.T) {
 // automatically set or by default
 func TestBuildUserDataCloudInitDefaultConfig(t *testing.T) {
 	c := BuildDefaultConfig()
-	var ci internal.CloudInitUserData
+	var ci configuration.CloudInitUserData
 	// test for second machine
 	// get only the minimum required for machine config
 	if err := ci.Build(&c.Machines[0]); err != nil {
@@ -78,8 +79,8 @@ func TestBuildUserDataCloudInitDefaultConfig(t *testing.T) {
 		t.Fail()
 	}
 	// output
-	if ci.Output.All != internal.CloudInitUserDataOutputAllString {
-		t.Errorf("'All' value expected is '%s' but got '%s'", internal.CloudInitUserDataOutputAllString, ci.Output.All)
+	if ci.Output.All != configuration.CloudInitUserDataOutputAllString {
+		t.Errorf("'All' value expected is '%s' but got '%s'", configuration.CloudInitUserDataOutputAllString, ci.Output.All)
 		t.Fail()
 	}
 	// users
@@ -87,10 +88,10 @@ func TestBuildUserDataCloudInitDefaultConfig(t *testing.T) {
 		t.Errorf("Expected no users but got '%d'", len(ci.Users))
 		t.FailNow()
 	}
-	expectedUName := internal.DefaultUserName
+	expectedUName := configuration.DefaultUserName
 	u := ci.Users[0]
 	if u.Name != expectedUName {
-		t.Errorf("Expected user name '%s' but got '%s'", internal.DefaultUserName, u.Name)
+		t.Errorf("Expected user name '%s' but got '%s'", configuration.DefaultUserName, u.Name)
 		t.Fail()
 	}
 	if u.Sudo != nil {
@@ -101,12 +102,12 @@ func TestBuildUserDataCloudInitDefaultConfig(t *testing.T) {
 		t.Errorf("Expected user lockpasswd 'false' but got 'true'")
 		t.Fail()
 	}
-	if u.Shell != internal.CloudInitUserDataUserShellString {
-		t.Errorf("Expected user sudo value '%s' but got '%s'", internal.CloudInitUserDataUserShellString, u.Shell)
+	if u.Shell != configuration.CloudInitUserDataUserShellString {
+		t.Errorf("Expected user sudo value '%s' but got '%s'", configuration.CloudInitUserDataUserShellString, u.Shell)
 		t.Fail()
 	}
-	if u.Passwd != internal.DefaultUserPassword {
-		t.Errorf("Expected password '%s' but got '%s'", internal.DefaultUserPassword, u.Passwd)
+	if u.Passwd != configuration.DefaultUserPassword {
+		t.Errorf("Expected password '%s' but got '%s'", configuration.DefaultUserPassword, u.Passwd)
 		t.Fail()
 	}
 	if u.Groups != "" {
@@ -153,7 +154,7 @@ func TestBuildUserDataCloudInitDefaultConfig(t *testing.T) {
 // that can be set in a configuration
 func TestBuildUserDataCloudInitCompleteConfig(t *testing.T) {
 	c := BuildCompleteConfig()
-	var ci internal.CloudInitUserData
+	var ci configuration.CloudInitUserData
 	// test for first machine
 	if err := ci.Build(&c.Machines[0]); err != nil {
 		t.Errorf("Could not build cloud init configuration from complete config: %v", err)
@@ -170,8 +171,8 @@ func TestBuildUserDataCloudInitCompleteConfig(t *testing.T) {
 		t.Errorf("Expected user name '%s' but got '%s'", expectedU1Name, u1.Name)
 		t.Fail()
 	}
-	if !compareOrderedStringSlices(u1.Sudo, internal.GetCloudInitUserDataUserSudoStringConst()) {
-		t.Errorf("Expected user sudo value '%s' but got '%s'", internal.CloudInitUserDataUserSudoString, u1.Sudo)
+	if !compareOrderedStringSlices(u1.Sudo, configuration.GetCloudInitUserDataUserSudoStringConst()) {
+		t.Errorf("Expected user sudo value '%s' but got '%s'", configuration.CloudInitUserDataUserSudoString, u1.Sudo)
 		t.Fail()
 	}
 	if u1.LockPasswd {
@@ -215,8 +216,8 @@ func TestBuildUserDataCloudInitCompleteConfig(t *testing.T) {
 		t.FailNow()
 	}
 	f1 := ci.WriteFiles[0]
-	if f1.Encoding != internal.CloudInitUserDataFilesEncoding {
-		t.Errorf("Expected file encoding '%s' but got '%s'", internal.CloudInitUserDataFilesEncoding, f1.Encoding)
+	if f1.Encoding != configuration.CloudInitUserDataFilesEncoding {
+		t.Errorf("Expected file encoding '%s' but got '%s'", configuration.CloudInitUserDataFilesEncoding, f1.Encoding)
 		t.Fail()
 	}
 	expectedF1Content := internal.EncodeB64Bytes([]byte(ExpectedHelloFileContent))
@@ -282,7 +283,7 @@ type expectedFilesPath struct {
 }
 
 func getCloudInitTestDirPath() string {
-	return filepath.Join(FreyjaUnitTestDir, cloudInitTestDirname)
+	return filepath.Join(internalTest.FreyjaUnitTestDir, cloudInitTestDirname)
 }
 
 // TestGenerateCloudInitConfigs verifies that the configs are properly built and written
@@ -314,7 +315,7 @@ func TestGenerateCloudInitConfigs(t *testing.T) {
 
 // testGeneratedDefaultCloudInitConfigs test the generated cloud init files
 // To test the content, this method takes the first machine config only
-func testGeneratedDefaultCloudInitConfigs(t *testing.T, testDirName string, config *internal.ConfigurationData, expected map[string]expectedFilesPath) {
+func testGeneratedDefaultCloudInitConfigs(t *testing.T, testDirName string, config *configuration.FreyjaConfiguration, expected map[string]expectedFilesPath) {
 	var err error
 	for _, machine := range config.Machines {
 		testDir := filepath.Join(getCloudInitTestDirPath(), testDirName, machine.Hostname)

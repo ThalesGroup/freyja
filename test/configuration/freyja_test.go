@@ -1,8 +1,9 @@
-package internal
+package configuration
 
 import (
 	"embed"
-	"freyja/internal"
+	"freyja/internal/configuration"
+	internal2 "freyja/test"
 	"log"
 	"os"
 	"testing"
@@ -45,17 +46,17 @@ const ExpectedHelloFileContent string = "hello"
 // ExpectedWorldContent inject some content in temp file for unit tests
 const ExpectedWorldFileContent string = "world"
 
-const FreyjaUnitTestConfigDir string = FreyjaUnitTestDir + "/config"
+const FreyjaUnitTestConfigDir string = internal2.FreyjaUnitTestDir + "/config"
 
-func BuildCompleteConfig() *internal.ConfigurationData {
+func BuildCompleteConfig() *configuration.FreyjaConfiguration {
 	parentDir := "config"
 	// mandatory files for the test
-	WriteTempTestFile(SamPubFileName, parentDir, []byte(ExpectedSamPubFileContent))
-	WriteTempTestFile(ExtPubFileName, parentDir, []byte(ExpectedExtPubFileContent))
-	WriteTempTestFile(HelloFileName, parentDir, []byte(ExpectedHelloFileContent))
-	WriteTempTestFile(WorldFileName, parentDir, []byte(ExpectedWorldFileContent))
+	internal2.WriteTempTestFile(SamPubFileName, parentDir, []byte(ExpectedSamPubFileContent))
+	internal2.WriteTempTestFile(ExtPubFileName, parentDir, []byte(ExpectedExtPubFileContent))
+	internal2.WriteTempTestFile(HelloFileName, parentDir, []byte(ExpectedHelloFileContent))
+	internal2.WriteTempTestFile(WorldFileName, parentDir, []byte(ExpectedWorldFileContent))
 	// build freyja config
-	var c internal.ConfigurationData
+	var c configuration.FreyjaConfiguration
 	if err := c.BuildFromFile(TestFileValidCompleteConfiguration); err != nil {
 		log.Printf("Cannot build configuration from file '%s': %v", TestFileValidCompleteConfiguration, err)
 		os.Exit(1)
@@ -63,9 +64,9 @@ func BuildCompleteConfig() *internal.ConfigurationData {
 	return &c
 }
 
-func BuildDefaultConfig() *internal.ConfigurationData {
+func BuildDefaultConfig() *configuration.FreyjaConfiguration {
 	// build freyja config
-	var c internal.ConfigurationData
+	var c configuration.FreyjaConfiguration
 	if err := c.BuildFromFile(testFileValidDefaultConfiguration); err != nil {
 		log.Printf("Cannot build configuration from file '%s': %v", testFileValidDefaultConfiguration, err)
 		os.Exit(1)
@@ -87,19 +88,19 @@ func compareOrderedStringSlices(slice1 []string, slice2 []string) bool {
 
 // replaceFirstConfNetwork takes the first network configuration in config and replace it by the
 // given one. Useful for the unit tests.
-func replaceFirstConfNetwork(c *internal.ConfigurationData, n *internal.ConfigurationNetwork) {
+func replaceFirstConfNetwork(c *configuration.FreyjaConfiguration, n *configuration.FreyjaConfigurationNetwork) {
 	c.Machines[0].Networks[0] = *n
 }
 
 // replaceFirstConfUser takes the first user configuration in config and replace it by the
 // given one. Useful for the unit tests.
-func replaceFirstConfUser(c *internal.ConfigurationData, u *internal.ConfigurationUser) {
+func replaceFirstConfUser(c *configuration.FreyjaConfiguration, u *configuration.FreyjaConfigurationUser) {
 	c.Machines[0].Users[0] = *u
 }
 
 // replaceFirstConfFile takes the first file configuration in config and replace it by the
 // given one. Useful for the unit tests.
-func replaceFirstConfFile(c *internal.ConfigurationData, f *internal.ConfigurationFile) {
+func replaceFirstConfFile(c *configuration.FreyjaConfiguration, f *configuration.FreyjaConfigurationFile) {
 	c.Machines[0].Files[0] = *f
 }
 
@@ -111,7 +112,7 @@ func TestValidate(t *testing.T) {
 	testValidateFiles(t, c)
 }
 
-func testValidateVersion(t *testing.T, c *internal.ConfigurationData) {
+func testValidateVersion(t *testing.T, c *configuration.FreyjaConfiguration) {
 	// invalid
 	values := []string{"1", "beta", ""}
 	for _, value := range values {
@@ -132,7 +133,7 @@ func testValidateVersion(t *testing.T, c *internal.ConfigurationData) {
 	}
 }
 
-func testValidateNetwork(t *testing.T, c *internal.ConfigurationData) {
+func testValidateNetwork(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationNetwork := c.Machines[0].Networks[0]
 	// invalid name value
 	// error should be raised here
@@ -172,9 +173,9 @@ func testValidateNetwork(t *testing.T, c *internal.ConfigurationData) {
 
 }
 
-func testValidateUser(t *testing.T, c *internal.ConfigurationData) {
+func testValidateUser(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationUser := c.Machines[0].Users[0]
-	tempFile := WriteTempTestFile("test-valid-user-key.pub", "config", []byte("test"))
+	tempFile := internal2.WriteTempTestFile("test-valid-user-key.pub", "config", []byte("test"))
 	// invalid
 	configurationUser.Keys = append(configurationUser.Keys, "dumb")
 	replaceFirstConfUser(c, &configurationUser)
@@ -191,7 +192,7 @@ func testValidateUser(t *testing.T, c *internal.ConfigurationData) {
 	}
 }
 
-func testValidateFiles(t *testing.T, c *internal.ConfigurationData) {
+func testValidateFiles(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationFile := c.Machines[0].Files[0]
 
 	// SOURCE
@@ -206,7 +207,7 @@ func testValidateFiles(t *testing.T, c *internal.ConfigurationData) {
 		}
 	}
 	// valid values
-	tempFile := WriteTempTestFile("test-valid-file-source.txt", "config", []byte("test"))
+	tempFile := internal2.WriteTempTestFile("test-valid-file-source.txt", "config", []byte("test"))
 	values = []string{tempFile, "/dev/null"}
 	for _, value := range values {
 		configurationFile.Source = value
@@ -265,7 +266,7 @@ func testValidateFiles(t *testing.T, c *internal.ConfigurationData) {
 
 func TestBuildEmptyConfiguration(t *testing.T) {
 	//var c internal.Configuration
-	var c internal.ConfigurationData
+	var c configuration.FreyjaConfiguration
 	if err := c.BuildFromFile(testFileEmptyConfiguration); err == nil {
 		t.Logf("empty configuration valid instead of invalid: %v", c)
 		t.Fail()
@@ -275,7 +276,7 @@ func TestBuildEmptyConfiguration(t *testing.T) {
 // TestBuildDefaultConfiguration only checks if minimum required values are set and that default values work
 func TestBuildDefaultConfiguration(t *testing.T) {
 	// build config
-	var c internal.ConfigurationData
+	var c configuration.FreyjaConfiguration
 	if err := c.BuildFromFile(testFileValidDefaultConfiguration); err != nil {
 		log.Printf("Cannot build configuration from file '%s': %v", testFileValidDefaultConfiguration, err)
 		t.Fail()
@@ -319,27 +320,27 @@ func TestBuildDefaultConfiguration(t *testing.T) {
 		t.Logf("expected only one user but got '%d'", len(m.Users))
 		t.Fail()
 	}
-	if m.Users[0].Name != internal.DefaultUserName {
-		t.Logf("expected username '%s' but got '%s'", internal.DefaultUserName, m.Users[0].Name)
+	if m.Users[0].Name != configuration.DefaultUserName {
+		t.Logf("expected username '%s' but got '%s'", configuration.DefaultUserName, m.Users[0].Name)
 		t.Fail()
 	}
-	if m.Users[0].Password != internal.DefaultUserPassword {
-		t.Logf("expected password '%s' but got '%s'", internal.DefaultUserPassword, m.Users[0].Password)
+	if m.Users[0].Password != configuration.DefaultUserPassword {
+		t.Logf("expected password '%s' but got '%s'", configuration.DefaultUserPassword, m.Users[0].Password)
 		t.Fail()
 	}
 	// Storage
-	if m.Storage != internal.DefaultMachineStorage {
-		t.Logf("expected storage '%d' but got '%d'", internal.DefaultMachineStorage, m.Storage)
+	if m.Storage != configuration.DefaultMachineStorage {
+		t.Logf("expected storage '%d' but got '%d'", configuration.DefaultMachineStorage, m.Storage)
 		t.Fail()
 	}
 	// memory
-	if m.Memory != internal.DefaultMachineMemory {
-		t.Logf("expected memory '%d' but got '%d'", internal.DefaultMachineMemory, m.Memory)
+	if m.Memory != configuration.DefaultMachineMemory {
+		t.Logf("expected memory '%d' but got '%d'", configuration.DefaultMachineMemory, m.Memory)
 		t.Fail()
 	}
 	// vcpu
-	if m.Vcpu != internal.DefaultMachineVcpu {
-		t.Logf("expected vcpu '%d' but got '%d'", internal.DefaultMachineVcpu, m.Vcpu)
+	if m.Vcpu != configuration.DefaultMachineVcpu {
+		t.Logf("expected vcpu '%d' but got '%d'", configuration.DefaultMachineVcpu, m.Vcpu)
 		t.Fail()
 	}
 	// packages : empty by default
@@ -368,7 +369,7 @@ func TestBuildDefaultConfiguration(t *testing.T) {
 // TestBuildDefaultFilesConfig only checks if minimum required values for files are set and that default values work
 func TestBuildDefaultFilesConfig(t *testing.T) {
 	// build config
-	var c internal.ConfigurationData
+	var c configuration.FreyjaConfiguration
 	if err := c.BuildFromFile(testFileValidDefaultFilesConfiguration); err != nil {
 		log.Printf("Cannot build configuration from file '%s': %v", testFileValidDefaultFilesConfiguration, err)
 		t.Fail()

@@ -88,7 +88,7 @@ func compareOrderedStringSlices(slice1 []string, slice2 []string) bool {
 
 // replaceFirstConfNetwork takes the first network configuration in config and replace it by the
 // given one. Useful for the unit tests.
-func replaceFirstConfNetwork(c *configuration.FreyjaConfiguration, n *configuration.FreyjaConfigurationNetwork) {
+func replaceFirstConfNetwork(c *configuration.FreyjaConfiguration, n *configuration.FreyjaConfigurationMachineNetwork) {
 	c.Machines[0].Networks[0] = *n
 }
 

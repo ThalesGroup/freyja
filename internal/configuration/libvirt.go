@@ -49,6 +49,8 @@ type DeviceConsoleType string
 
 type DeviceConsoleTargetType string
 
+type NetworkForwardMode string
+
 const (
 	X86OSArch OSArch = "x86_64"
 )
@@ -106,6 +108,13 @@ const (
 )
 
 const (
+	// NetworkForwardModeNat default
+	NetworkForwardModeNat NetworkForwardMode = "nat"
+	// NetworkForwardModeRoute when user input includes a host's target interface for guests net
+	NetworkForwardModeRoute NetworkForwardMode = "route"
+)
+
+const (
 	PtyDeviceSerialType DeviceSerialType = "pty"
 )
 
@@ -137,12 +146,11 @@ const DefaultInterfaceSourceNetwork string = "default"
 
 const DefaultOsType string = "hvm"
 
-var DefaultDeviceInterface XMLDomainDescriptionDevicesInterface = XMLDomainDescriptionDevicesInterface{
+var DefaultDeviceInterface = XMLDomainDescriptionDevicesInterface{
 	Type: DefaultDeviceInterfaceType,
-	// TODO : can the mac address remain nil ?
 	//Mac:     nil,
 	Source: &XMLDomainDescriptionDevicesInterfaceSource{
-		Bridge:  DefaultInterfaceSourceBridge,
+		//Bridge:  DefaultInterfaceSourceBridge,
 		Network: DefaultInterfaceSourceNetwork,
 	},
 	Model: &XMLDomainDescriptionDevicesInterfaceModel{
@@ -411,31 +419,25 @@ type XMLDomainDescriptionDevicesConsoleTarget struct {
 }
 
 // XMLNetworkDescription example
-// CREATE EXAMPLE :
-// <network>
+// https://libvirt.org/formatnetwork.html#routed-network-config
+// name is mandatory and unique
+// uuid is optional
+// bridge is  mandatory and should start with 'virbr'
+// domain is optional to define the dns
+// forward is optional
+// ip ?
 //
-//	<name>default</name>
-//	<bridge name="virbr0"/>
-//	<forward mode="nat"/>
-//	<ip address="192.168.122.1" netmask="255.255.255.0">
-//	  <dhcp>
-//	    <range start="192.168.122.2" end="192.168.122.254"/>
-//	  </dhcp>
-//	</ip>
-//	<ip family="ipv6" address="2001:db8:ca2:2::1" prefix="64"/>
+// WARNINGS:
+//   - For networks with a forward mode of bridge, private, vepa, and passthrough, it is assumed that
+//     the host has any necessary DNS and DHCP services already setup outside the scope of libvirt.
 //
-// </network>
-// INFO EXAMPLE :
+// EXAMPLE :
 // <network>
 //
 //	<name>default</name>
 //	<uuid>39d20ff2-296f-4bc5-b7c7-0ea755ab76f3</uuid>
-//	<forward mode='nat'>
-//	  <nat>
-//	    <port start='1024' end='65535'/>
-//	  </nat>
-//	</forward>
-//	<bridge name='virbr0' stp='on' delay='0'/>
+//	<bridge name='virbr0'/>
+//	<forward mode="nat"/>
 //	<mac address='52:54:00:78:b0:16'/>
 //	<ip address='192.168.122.1' netmask='255.255.255.0'>
 //	  <dhcp>
@@ -447,16 +449,17 @@ type XMLDomainDescriptionDevicesConsoleTarget struct {
 type XMLNetworkDescription struct {
 	XMLName xml.Name                      `xml:"network"`
 	Name    string                        `xml:"name"`
-	UUID    string                        `xml:"uuid"`
-	Forward *XMLNetworkDescriptionForward `xml:"forward"`
+	UUID    string                        `xml:"uuid,omitempty"`
+	Forward *XMLNetworkDescriptionForward `xml:"forward,omitempty"`
 	Bridge  *XMLNetworkDescriptionBridge  `xml:"bridge"`
-	Mac     *XMLNetworkDescriptionMac     `xml:"mac"`
-	Ip      *XMLNetworkDescriptionIp      `xml:"ip"`
+	Mac     *XMLNetworkDescriptionMac     `xml:"mac,omitempty"`
+	Ip      *XMLNetworkDescriptionIp      `xml:"ip,omitempty"`
 }
 
 type XMLNetworkDescriptionForward struct {
 	XMLName xml.Name `xml:"forward"`
 	Mode    string   `xml:"mode,attr"`
+	Dev     string   `xml:"dev,attr,omitempty"`
 }
 
 type XMLNetworkDescriptionBridge struct {
@@ -466,7 +469,7 @@ type XMLNetworkDescriptionBridge struct {
 
 type XMLNetworkDescriptionMac struct {
 	XMLName xml.Name `xml:"mac"`
-	Address string   `xml:"address,attr"`
+	Address string   `xml:"address,attr,omitempty"`
 }
 
 type XMLNetworkDescriptionIp struct {
@@ -617,33 +620,33 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 	//            <mac address="52:54:00:17:49:b7"/>
 	//            <source network="default"/>
 	//        </interface>
-	var bridgeInterfaceDevices []XMLDomainDescriptionDevicesInterface
+	var networkInterfaceDevices []XMLDomainDescriptionDevicesInterface
 	if len(cm.Networks) > 0 {
 		// user defined networks
-		bridgeInterfaceDevices = make([]XMLDomainDescriptionDevicesInterface, len(cm.Networks))
+		networkInterfaceDevices = make([]XMLDomainDescriptionDevicesInterface, len(cm.Networks))
 		for _, network := range cm.Networks {
-			// TODO :
-			//  - add the possibility to provide the host's target interface
-			bridgeInterfaceDevice := XMLDomainDescriptionDevicesInterface{
+			networkInterfaceDevice := XMLDomainDescriptionDevicesInterface{
 				Type: string(NetworkDeviceInterfaceType),
-				Mac: &XMLDomainDescriptionDevicesInterfaceMac{
-					Address: network.Mac,
-				},
 				Source: &XMLDomainDescriptionDevicesInterfaceSource{
-					Bridge:  DefaultInterfaceSourceBridge,
+					//Bridge:  DefaultInterfaceSourceBridge,
 					Network: network.Name,
 				},
 				//Target: XMLDomainDescriptionDevicesInterfaceTarget{}, // provide if user conf specifies a host interface
-				Target: nil,
-				Model: &XMLDomainDescriptionDevicesInterfaceModel{
-					Type: DefaultInterfaceModelType,
-				},
+				//Target: nil,
+				//Model: &XMLDomainDescriptionDevicesInterfaceModel{
+				//	Type: DefaultInterfaceModelType,
+				//},
 			}
-			bridgeInterfaceDevices = append(bridgeInterfaceDevices, bridgeInterfaceDevice)
+			if network.Mac != "" {
+				networkInterfaceDevice.Mac = &XMLDomainDescriptionDevicesInterfaceMac{
+					Address: network.Mac,
+				}
+			}
+			networkInterfaceDevices = append(networkInterfaceDevices, networkInterfaceDevice)
 		}
 	} else {
 		// if no network define in user conf input, stick with the default one
-		bridgeInterfaceDevices = []XMLDomainDescriptionDevicesInterface{DefaultDeviceInterface}
+		networkInterfaceDevices = []XMLDomainDescriptionDevicesInterface{DefaultDeviceInterface}
 	}
 
 	// console device for graphical debug
@@ -669,9 +672,67 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 		Devices: &XMLDomainDescriptionDevices{
 			Emulator:   string(QemuX86DevicesEmulator),
 			Disks:      deviceDisks,
-			Interfaces: bridgeInterfaceDevices,
+			Interfaces: networkInterfaceDevices,
 			Console:    []XMLDomainDescriptionDevicesConsole{consoleDevice},
 		},
 	}
 	return xml.Marshal(xmlDescription)
+}
+
+// CreateLibvirtNetworkXMLDescription
+// to create a network with existing routed interfaces on host :
+// https://libvirt.org/formatnetwork.html#routed-network-config
+// Minimalist possible configuration is :
+// <network>
+//
+//	<name>default</name>
+//
+// </network>
+//
+// A more detailed configuration is :
+// <network>
+//
+//	<name>default</name>
+//	<forward mode="nat"/>
+//	<ip address="192.168.122.1" netmask="255.255.255.0">
+//	  <dhcp>
+//	    <range start="192.168.122.3" end="192.168.122.254"/>
+//	  </dhcp>
+//	</ip>
+//
+// </network>
+func CreateLibvirtNetworkXMLDescription(networkConfiguration FreyjaConfigurationNetwork) (data []byte, err error) {
+
+	xmlNetworkDescription := XMLNetworkDescription{
+		Name: networkConfiguration.Name,
+	}
+		//UUID:    internal.GenerateUUID(),
+		//Forward: &XMLNetworkDescriptionForward{
+		//	Mode: string(NetworkForwardModeNat),
+		//},
+		//Bridge: &XMLNetworkDescriptionBridge{
+		//	Name: DefaultInterfaceName,
+		//},
+	// set mac address only if provided
+	// otherwise, libvirt will deliver one
+	//if networkConfiguration.Mac != "" {
+	//	xmlNetworkDescription.Mac = &XMLNetworkDescriptionMac{
+	//		Address: networkConfiguration.Mac,
+	//	}
+	//}
+
+	return xml.Marshal(xmlNetworkDescription)
+}
+
+func DumpNetworkConfig(xmlNetworkDescription []byte, path string) (err error) {
+	// re-create the file to inject data
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("cannot create XML network description'%s' : %w", path, err)
+	}
+	// write the xml description to location
+	if _, err = file.Write(xmlNetworkDescription); err != nil {
+		return fmt.Errorf("could not write XML network description to '%s': %w", path, err)
+	}
+	return nil
 }

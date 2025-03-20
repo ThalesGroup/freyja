@@ -22,6 +22,7 @@ var LibvirtConnexion *libvirt.Libvirt
 var FreyjaWorkspaceDir = filepath.Join(os.Getenv("HOME"), ".freyja")
 
 var FreyjaMachinesWorkspaceDir = filepath.Join(FreyjaWorkspaceDir, "machines")
+var FreyjaNetworksWorkspaceDir = filepath.Join(FreyjaWorkspaceDir, "networks")
 
 //go:embed templates
 var Templates embed.FS

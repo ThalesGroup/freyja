@@ -67,7 +67,7 @@ func getNetworkDescription(networkName string) (netDesc *NetworkDescription, err
 	// get network from name
 	network, err := LibvirtConnexion.NetworkLookupByName(networkName)
 	if err != nil {
-		Logger.Error("Cannot lookup network by name using Qemu connexion", "network", network.Name)
+		Logger.Error("Cannot lookup network by name using Qemu connexion", "network", networkName)
 		return nil, err
 	}
 

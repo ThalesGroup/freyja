@@ -25,10 +25,24 @@ const DefaultMachineMemory uint = 4096
 // DefaultMachineVcpu = 1 vcpu
 const DefaultMachineVcpu uint = 1
 
+const DefaultNetworkName string = "default"
+
+const DefaultInterfaceName string = "virbr0"
+
 // FreyjaConfiguration is the base model for freyja configuration parameters
 // Example :
 // ---
 // version: v0.1.0-beta
+// networks:
+//   - name: ctrl-plane
+//     dhcp:
+//     start: 192.168.123.3
+//     end: 192.168.123.254
+//   - name: data-plane
+//     dhcp:
+//     start: 192.168.124.3
+//     end: 192.168.124.254
+//
 // machines:
 //   - image: "/tmp/CentOS-Stream-GenericCloud-8-20210603.0.x86_64.qcow2" # MANDATORY
 //     os: "centos8" # MANDATORY
@@ -65,6 +79,7 @@ const DefaultMachineVcpu uint = 1
 type FreyjaConfiguration struct {
 	Version  string                       `yaml:"version"`
 	Machines []FreyjaConfigurationMachine `yaml:"machines"`
+	Networks []FreyjaConfigurationNetwork `yaml:"networks,omitempty"`
 }
 
 // FreyjaConfigurationMachine is the configuration model for libvirt guest parameters
@@ -74,19 +89,19 @@ type FreyjaConfigurationMachine struct {
 	Os       string `yaml:"os"`       // os type in libosinfo
 	Hostname string `yaml:"hostname"` // domain name in libvirt
 	// optional
-	Networks []FreyjaConfigurationNetwork `yaml:"networks"`
-	Users    []FreyjaConfigurationUser    `yaml:"users"`
-	Storage  uint                         `yaml:"storage"` // GiB
-	Memory   uint                         `yaml:"memory"`  // MiB
-	Vcpu     uint                         `yaml:"vcpu"`
-	Packages []string                     `yaml:"packages"`
-	Cmd      []string                     `yaml:"cmd"`
-	Files    []FreyjaConfigurationFile    `yaml:"files"`
-	Update   bool                         `yaml:"update"`
-	Reboot   bool                         `yaml:"reboot"`
+	Networks []FreyjaConfigurationMachineNetwork `yaml:"networks,omitempty"`
+	Users    []FreyjaConfigurationUser           `yaml:"users,omitempty"`
+	Storage  uint                                `yaml:"storage"` // GiB
+	Memory   uint                                `yaml:"memory"`  // MiB
+	Vcpu     uint                                `yaml:"vcpu"`
+	Packages []string                            `yaml:"packages"`
+	Cmd      []string                            `yaml:"cmd"`
+	Files    []FreyjaConfigurationFile           `yaml:"files"`
+	Update   bool                                `yaml:"update"`
+	Reboot   bool                                `yaml:"reboot"`
 }
 
-type FreyjaConfigurationNetwork struct {
+type FreyjaConfigurationMachineNetwork struct {
 	Name      string `yaml:"name"`
 	Mac       string `yaml:"mac"`
 	Interface string `yaml:"interface"`
@@ -105,6 +120,17 @@ type FreyjaConfigurationFile struct {
 	Destination string `yaml:"destination"`
 	Permissions string `yaml:"permissions"`
 	Owner       string `yaml:"owner"`
+}
+
+type FreyjaConfigurationNetwork struct {
+	Name string                           `yaml:"name"`
+	Dhcp []FreyjaConfigurationNetworkDHCP `yaml:"dhcp,omitempty"`
+}
+
+type FreyjaConfigurationNetworkDHCP struct {
+	// DHCP range
+	Start string `yaml:"start"`
+	End   string `yaml:"end"`
 }
 
 type Configuration interface {
@@ -171,17 +197,21 @@ func (c *FreyjaConfiguration) validateVersion() error {
 // ValidateNetwork audits the network configuration including
 //   - the name of the network
 //   - the format of the mac address
-func (cn *FreyjaConfigurationNetwork) validateNetwork() error {
+func (cn *FreyjaConfigurationMachineNetwork) validateNetwork() error {
+	// network name
 	if cn.Name == "" {
 		return errors.New("network name is empty")
 	}
-	macRegex := "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"
-	match, err := regexp.MatchString(macRegex, cn.Mac)
-	if err != nil {
-		return fmt.Errorf("cannot verify pattern matching for string '%s': %w", cn.Mac, err)
-	}
-	if !match {
-		return errors.New(fmt.Sprintf("wrong mac format : regex is '%s' but found value '%s'", macRegex, cn.Mac))
+	// network mac address
+	if cn.Mac != "" {
+		macRegex := "^([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})$"
+		match, err := regexp.MatchString(macRegex, cn.Mac)
+		if err != nil {
+			return fmt.Errorf("cannot verify pattern matching for string '%s': %w", cn.Mac, err)
+		}
+		if !match {
+			return errors.New(fmt.Sprintf("wrong mac format : regex is '%s' but found value '%s'", macRegex, cn.Mac))
+		}
 	}
 	return nil
 }
@@ -282,6 +312,21 @@ func (c *FreyjaConfiguration) setDefaultValues() {
 					user.Password = DefaultUserPassword
 				}
 				machine.Users[j] = user
+			}
+		}
+		// default network
+		if len(machine.Networks) == 0 {
+			networks := make([]FreyjaConfigurationMachineNetwork, 1)
+			networks[0] = FreyjaConfigurationMachineNetwork{
+				Name: DefaultNetworkName,
+				//Interface: DefaultInterfaceName,
+			}
+			machine.Networks = networks
+		} else {
+			for _, network := range machine.Networks {
+				if network.Name == "" {
+					network.Name = DefaultNetworkName
+				}
 			}
 		}
 		// default storage

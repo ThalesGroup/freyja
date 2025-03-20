@@ -89,7 +89,6 @@ func RemoveIfExists(path string) (deleted bool, err error) {
 		}
 		return true, nil
 	}
-	Logger.Debug("not removed : doesn't exist", "path", path)
 	return false, nil
 }
 

@@ -1,92 +1,129 @@
 package shellcli
 
 import (
-	"encoding/xml"
-	"freyja/internal"
+	"fmt"
 	"freyja/internal/configuration"
 	"github.com/spf13/cobra"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
-type NetworkData struct {
-	Name      string
-	UUID      string
-	Interface string
-}
-
-var networkName string
+// RemoteProcNetworkSetAutostart is set to handle the int32 flag value for network autostart
+// protocol in libvirt
+// source : https://lists.libvirt.org/archives/list/devel@lists.libvirt.org/message/VTZOSYUKTVG3YXGFXOKJS5SLR2VFMMLS/
+var RemoteProcNetworkSetAutostart int32 = 48
 
 // commands definitions
 var networkCreateCmd = &cobra.Command{
 	Use:              "create",
 	Short:            "Network creation",
-	Long:             "Network creation using libvirt",
+	Long:             "Network creation to attach machines to it",
 	TraverseChildren: true, // ensure local flags do not spread to sub commands
 
 	Run: func(cmd *cobra.Command, args []string) {
-		// TODO :
-		//  to create a network with existing routed interfaces on host :
-		//  https://libvirt.org/formatnetwork.html#routed-network-config
+		Logger.Debug("create networks from configuration file", "config", configurationPath)
 
-		config := NetworkCreateConfig(networkName)
-		configXMLBytes, err := xml.Marshal(config)
-		if err != nil {
-			Logger.Error("cannot parse network config", "network", networkName, "config", config, "reason", err)
+		if err := createNetwork(); err != nil {
+			Logger.Error("cannot create networks", "reason", err.Error())
 			os.Exit(1)
 		}
-		configStr := string(configXMLBytes)
-
-		// create the network in libvirt
-		_, err = LibvirtConnexion.NetworkCreateXML(configStr)
-		if err != nil {
-			if strings.Contains(err.Error(), "already exists") {
-				Logger.Warn("Network already exists", "network", networkName)
-				os.Exit(0)
-			}
-			Logger.Error("Cannot create the network using libvirt", "config", configStr, "reason", err)
-			os.Exit(1)
-		}
-
-		// define the network in libvirt
-		net, err := LibvirtConnexion.NetworkDefineXML(configStr)
-		if err != nil {
-			Logger.Warn("Network created but could not define it in libvirt", "network", networkName, "reason", err)
-		}
-
-		// set autostart
-		if err := LibvirtConnexion.NetworkSetAutostart(net, 0); err != nil {
-			Logger.Warn("Network created and defined but could not set autostart in libvirt", "network", networkName, "reason", err)
-		}
-		Logger.Info("Network created", "name", networkName)
-
 	},
 }
 
 func init() {
-	networkCreateCmd.Flags().StringVarP(&networkName, "name", "n", "", "Name of the network to create")
-	if err := networkCreateCmd.MarkFlagRequired("name"); err != nil {
+	// MANDATORY --config, -c
+	networkCreateCmd.Flags().StringVarP(&configurationPath, "config", "c", "", "Path to the configuration file to create the networks only.")
+	if err := networkCreateCmd.MarkFlagRequired("config"); err != nil {
 		log.Panic(err.Error())
 	}
+	// OPTIONAL --dry-run
+	networkCreateCmd.Flags().BoolVarP(&dryRun, "dry-run", "", false, "Generate all config files without creating the machine")
 }
 
-// NetworkCreateConfig
-// TODO :
-//
-//	to create a network with existing routed interfaces on host :
-//	https://libvirt.org/formatnetwork.html#routed-network-config
-func NetworkCreateConfig(networkName string) configuration.XMLNetworkDescription {
-	configForward := configuration.XMLNetworkDescriptionForward{
-		Mode: "bridge",
+func createNetwork() (err error) {
+	// build config from path
+	var freyjaConfiguration configuration.FreyjaConfiguration
+	if err = freyjaConfiguration.BuildFromFile(configurationPath); err != nil {
+		return fmt.Errorf("cannot parse configuration file '%s': %w", configurationPath, err)
 	}
-	configBridge := configuration.XMLNetworkDescriptionBridge{
-		Name: "virbr0",
+
+	// create networks
+	for _, network := range freyjaConfiguration.Networks {
+		// check if network already exists
+		// it prevents to update an existing network used by running machines and avoid
+		// unwanted side effects
+		foundNet, err := LibvirtConnexion.NetworkLookupByName(network.Name)
+		if err != nil {
+			// ignore error only if it contains the message that the network does not exist
+			// which is the purpose of this command
+			if strings.Contains(err.Error(), "not found") {
+				// create network directory
+				Logger.Debug("create network dir", "network", network.Name, "parent", FreyjaNetworksWorkspaceDir)
+				networkDirPath, err := createNetworkDir(&network)
+				if err != nil {
+					return fmt.Errorf("cannot create network '%s' workspace directory in '%s': %w", networkName, networkDirPath, err)
+				}
+
+				// create libvirt network configuration
+				// also store the network configs dump path in a map to create them later
+				// it is useful in case of a --dry-run generation
+				Logger.Debug("create network XML description for lib")
+				var xmlDescription []byte
+				if xmlDescription, err = configuration.CreateLibvirtNetworkXMLDescription(network); err != nil {
+					return fmt.Errorf("cannot create the libvirt XML description for network '%s': %w", network.Name, err)
+				}
+				filename := fmt.Sprintf("%s%s%s", XMLNetworkDescriptionPrefix, network.Name, XMLNetworkDescriptionSuffix)
+				xmlNetworkDescriptionPath := filepath.Join(networkDirPath, filename)
+				if err = configuration.DumpNetworkConfig(xmlDescription, xmlNetworkDescriptionPath); err != nil {
+					// the xml configuration has been created but cannot be written on disk
+					// this is a warning and not an error since it does not prevent the network
+					// to be created in libvirt
+					Logger.Warn("cannot write libvirt network XML description", "network", network.Name, "path", xmlNetworkDescriptionPath, "reason", err.Error())
+				}
+
+				// create the network in libvirt
+				if !dryRun {
+					Logger.Info("create network", "network", network.Name)
+					Logger.Debug("define network from libvirt xml description", "network", network.Name, "path", xmlNetworkDescriptionPath)
+					net, err := LibvirtConnexion.NetworkDefineXML(string(xmlDescription))
+					if err != nil {
+						return fmt.Errorf("cannot define network '%s' in libvirt from xml description: %w", network.Name, err)
+					}
+
+					Logger.Debug("create network from libvirt xml description", "network", network.Name, "path", xmlNetworkDescriptionPath)
+					if err = LibvirtConnexion.NetworkCreate(net); err != nil {
+						return fmt.Errorf("cannot create network '%s' in libvirt: %w", network.Name, err)
+					}
+
+					if err = LibvirtConnexion.NetworkSetAutostart(net, RemoteProcNetworkSetAutostart); err != nil {
+						Logger.Warn("cannot set network autostart in libvirt", "reason", err.Error(), "network", network.Name)
+					}
+				} else {
+					Logger.Warn("skipped creation", "network", network.Name, "reason", "option --dry-run")
+				}
+
+			} else {
+				// unwanted error
+				return err
+			}
+		} else if network.Name == foundNet.Name {
+			// if error is not nil and network exists, skip this one
+			Logger.Warn("skip creation : network already exists", "network", network.Name)
+			continue
+		}
 	}
-	return configuration.XMLNetworkDescription{
-		Name:    networkName,
-		UUID:    internal.GenerateUUID(),
-		Forward: &configForward,
-		Bridge:  &configBridge,
+	return nil
+}
+
+// createMachineDir returns the created dir, or an error
+func createNetworkDir(network *configuration.FreyjaConfigurationNetwork) (string, error) {
+	networkDirPath := filepath.Join(FreyjaNetworksWorkspaceDir, network.Name)
+	if _, err := os.Stat(networkDirPath); os.IsNotExist(err) {
+		if err := os.MkdirAll(networkDirPath, os.ModePerm); err != nil {
+			return "", err
+		}
 	}
+	return networkDirPath, nil
 }

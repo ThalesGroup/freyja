@@ -1,0 +1,10 @@
+---
+version: v0.1.0-beta
+machines:
+  - hostname: "vm1" # MANDATORY, MUST NOT contain underscores
+    image: "/tmp/debian-12-generic-amd64.qcow2" # MANDATORY
+    os: "debian12" # MANDATORY
+    networks:
+      - name: ctrl-plane
+      - name: data-plane
+

@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const ISOCloudInitFileSuffix string = "-cloud-init.iso"
+const ISOCloudInitFilename string = "cloud-init.iso"
 
 // **********
 // DATA MODEL
@@ -407,7 +407,7 @@ func CreateCloudInitIso(machine *FreyjaConfigurationMachine, machineDir string) 
 	// delete pre-existing ISO file for provision update
 
 	// write iso on filesystem
-	isoOutputPath := filepath.Join(machineDir, fmt.Sprintf("%s%s", machine.Hostname, ISOCloudInitFileSuffix))
+	isoOutputPath := filepath.Join(machineDir, ISOCloudInitFilename)
 	_, err = internal.RemoveIfExists(isoOutputPath)
 	if err != nil {
 		return "", fmt.Errorf("cannot replace the cloud init ISO file in '%s' : %w", isoOutputPath, err)

@@ -138,6 +138,8 @@ const DefaultDomainType string = "kvm"
 
 const DefaultDeviceInterfaceType = string(NetworkDeviceInterfaceType)
 
+const DefaultNetworkForwardMode = string(NetworkForwardModeNat)
+
 const DefaultInterfaceSourceBridge string = "virbr0"
 
 const DefaultInterfaceModelType string = "virtio"
@@ -624,7 +626,7 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 	if len(cm.Networks) > 0 {
 		// user defined networks
 		networkInterfaceDevices = make([]XMLDomainDescriptionDevicesInterface, len(cm.Networks))
-		for _, network := range cm.Networks {
+		for i, network := range cm.Networks {
 			networkInterfaceDevice := XMLDomainDescriptionDevicesInterface{
 				Type: string(NetworkDeviceInterfaceType),
 				Source: &XMLDomainDescriptionDevicesInterfaceSource{
@@ -642,7 +644,7 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 					Address: network.Mac,
 				}
 			}
-			networkInterfaceDevices = append(networkInterfaceDevices, networkInterfaceDevice)
+			networkInterfaceDevices[i] = networkInterfaceDevice
 		}
 	} else {
 		// if no network define in user conf input, stick with the default one
@@ -706,13 +708,13 @@ func CreateLibvirtNetworkXMLDescription(networkConfiguration FreyjaConfiguration
 	xmlNetworkDescription := XMLNetworkDescription{
 		Name: networkConfiguration.Name,
 	}
-		//UUID:    internal.GenerateUUID(),
-		//Forward: &XMLNetworkDescriptionForward{
-		//	Mode: string(NetworkForwardModeNat),
-		//},
-		//Bridge: &XMLNetworkDescriptionBridge{
-		//	Name: DefaultInterfaceName,
-		//},
+	//UUID:    internal.GenerateUUID(),
+	//Forward: &XMLNetworkDescriptionForward{
+	//	Mode: string(NetworkForwardModeNat),
+	//},
+	//Bridge: &XMLNetworkDescriptionBridge{
+	//	Name: DefaultInterfaceName,
+	//},
 	// set mac address only if provided
 	// otherwise, libvirt will deliver one
 	//if networkConfiguration.Mac != "" {

@@ -1,7 +1,6 @@
 package shellcli
 
 import (
-	"errors"
 	"freyja/internal"
 	"github.com/spf13/cobra"
 	"log"
@@ -34,17 +33,7 @@ var machineDeleteCmd = &cobra.Command{
 
 		// user confirmation
 		Logger.Info("delete", "machines", deleteDomainName)
-		agree, err := internal.AskUserYesNoConfirmation()
-		if err != nil {
-			if errors.Is(err, internal.ErrUserInput) {
-				Logger.Error("wrong choice", "reason", err)
-			} else {
-				Logger.Error("cannot analyse user choice", "reason", err)
-			}
-		}
-
-		// exec
-		if agree {
+		if internal.AskUserYesNoConfirmation() {
 			// stop libvirt domain
 			if err = LibvirtConnexion.DomainDestroy(domain); err != nil {
 				Logger.Error("cannot stop the machines", "machines", deleteDomainName, "reason", err)

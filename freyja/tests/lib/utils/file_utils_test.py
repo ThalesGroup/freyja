@@ -6,7 +6,7 @@ from freyja.tests.common import RESOURCES_DIR
 
 
 def test_read_files():
-    resources = ["detailed_conf.yaml", "net_control_plane.xml", "simple_conf.yaml"]
+    resources = ["detailed_conf.yaml", "net_control_plane.xml", "user_conf.yaml"]
     files_to_read = [Path(f"{RESOURCES_DIR}/{resource}") for resource in resources]
     contents = read_files(files_to_read)
 

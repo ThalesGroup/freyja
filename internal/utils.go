@@ -10,8 +10,8 @@ import (
 
 // Prompt
 
-// AskUserYesNoConfirmation returns true if user confirmed 'yes', false otherwise.
-func AskUserYesNoConfirmation() (bool, error) {
+// handleUserConfirmation proposes a yes/no choice to a user
+func handleUserConfirmation() (bool, error) {
 	//Display what you want from user
 	fmt.Print("Are you sure ? [Y/n]: ")
 	//Declare variable to store input
@@ -19,7 +19,7 @@ func AskUserYesNoConfirmation() (bool, error) {
 	//Take input from user
 	itemsSCanned, err := fmt.Scan(&choice)
 	if itemsSCanned != 1 {
-		return false, errors.New("More than one input from user were submitted")
+		return false, errors.New("more than one input from user were submitted")
 	}
 	if err != nil {
 		return false, err
@@ -34,6 +34,19 @@ func AskUserYesNoConfirmation() (bool, error) {
 		return false, &UserInputError{Message: fmt.Sprintf("unexpected user input: %s", choice)}
 	}
 
+}
+
+// AskUserYesNoConfirmation returns true if user confirmed 'yes', false otherwise.
+func AskUserYesNoConfirmation() (choice bool) {
+	agree, err := handleUserConfirmation()
+	if err != nil {
+		if errors.Is(err, ErrUserInput) {
+			Logger.Error("wrong choice", "reason", err)
+		} else {
+			Logger.Error("cannot analyse user choice", "reason", err)
+		}
+	}
+	return agree
 }
 
 // ID

@@ -8,6 +8,7 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v2"
 	"log"
+	"os"
 )
 
 type NetworkDescription struct {
@@ -43,11 +44,13 @@ var networkInfoCmd = &cobra.Command{
 		// generate short yaml description
 		info, err := getNetworkDescription(infoNetworkName)
 		if err != nil {
-			log.Panicf("Cannot get network '%s' info: %v", infoNetworkName, err)
+			Logger.Error("cannot get network info", "network", infoNetworkName, "reason", err.Error())
+			os.Exit(1)
 		}
 		output, err := yaml.Marshal(info)
 		if err != nil {
-			log.Panicf("Cannot parse network '%s' info in yaml format: %v", infoNetworkName, err)
+			Logger.Error("cannot parse network info", "network", infoNetworkName, "reason", err.Error())
+			os.Exit(1)
 		}
 		fmt.Print(string(output))
 	},
@@ -86,15 +89,25 @@ func getNetworkDescription(networkName string) (netDesc *NetworkDescription, err
 
 	// generate short description
 	netDesc = &NetworkDescription{
-		Name:    description.Name,
-		Mode:    description.Forward.Mode,
-		Bridge:  description.Bridge.Name,
-		Gateway: description.Ip.Address,
-		Netmask: description.Ip.Netmask,
-		Dhcp: DHCPDescription{
+		Name:   description.Name,
+		Bridge: description.Bridge.Name,
+	}
+	if description.Forward != nil {
+		if description.Forward.Mode == "" {
+			netDesc.Mode = configuration.DefaultNetworkForwardMode
+		} else {
+			netDesc.Mode = description.Forward.Mode
+		}
+	} else {
+		netDesc.Mode = configuration.DefaultNetworkForwardMode
+	}
+	if description.Ip != nil {
+		netDesc.Gateway = description.Ip.Address
+		netDesc.Netmask = description.Ip.Netmask
+		netDesc.Dhcp = DHCPDescription{
 			Start: description.Ip.Dhcp.Range.Start,
 			End:   description.Ip.Dhcp.Range.End,
-		},
+		}
 	}
 
 	// get the machines using this network

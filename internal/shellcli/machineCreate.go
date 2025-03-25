@@ -16,11 +16,24 @@ var dryRun bool
 
 const BackingImageFormat string = "qcow2"
 
-const BackingImageFileSuffix string = "-overlay-image." + BackingImageFormat
+const BackingImageFilename string = "overlay-image." + BackingImageFormat
 
 const RootImageFileSuffix string = "-root-image." + BackingImageFormat
 
-const XMLMachineDescriptionSuffix string = "-libvirt-conf.xml"
+const XMLMachineDescriptionFilename string = "libvirt-domain.xml"
+
+const XMLNetworkDescriptionPrefix string = "libvirt-network-"
+const XMLNetworkDescriptionSuffix string = ".xml"
+
+// MachineNetworkConfig is used as metadata struct to deal with the --dry-run option
+// Indeed, when a machine config contains networks, we generate the XML description file for libvirt
+// that we dump in the machine's dir for debug, then we register its path and its content inside
+// this structure to be created later, during the machine creation.
+type MachineNetworkConfig struct {
+	Name    string
+	Path    string
+	Content []byte
+}
 
 // commands definitions
 var machineCreateCmd = &cobra.Command{
@@ -63,12 +76,15 @@ var machineCreateCmd = &cobra.Command{
 			}
 
 			// create cloud-init iso file
-			Logger.Debug("create cloud ISO file", "machine", machine.Hostname, "parent", machineDirPath)
+			Logger.Debug("create cloud init ISO file", "machine", machine.Hostname, "parent", machineDirPath)
 			cloudInitIsoFile, err := configuration.CreateCloudInitIso(&machine, machineDirPath)
 			if err != nil {
 				Logger.Error("Cannot create machine ISO image file", "machine", machine.Hostname, "reason", err.Error())
 				os.Exit(1)
 			}
+
+			// Create networks for machines
+			// Use the same method as the network create command
 
 			// copy root image to the machine dir
 			// !!! NOT SURE IF ROOT IMAGE FILE SHOULD BE COPIED AS WELL
@@ -97,26 +113,33 @@ var machineCreateCmd = &cobra.Command{
 			Logger.Debug("create machine's XML libvirt description", "machine", machine.Hostname, "parent", machineDirPath)
 			xmlMachineDescription, err := configuration.CreateLibvirtDomainXMLDescription(&machine, overlayFile, cloudInitIsoFile)
 			if err != nil {
-				Logger.Error("cannot create the libvirt domain XML description from machine configuration", "machine", machine.Hostname, "reason", fmt.Sprintf("%v", err))
+				Logger.Error("cannot create the libvirt domain XML description from machine configuration", "machine", machine.Hostname, "reason", err.Error())
 				os.Exit(1)
 			}
 			// dump description in machine dir (useful for debug)
-			xmlMachineDescriptionPath := filepath.Join(machineDirPath, machine.Hostname+XMLMachineDescriptionSuffix)
+			xmlMachineDescriptionPath := filepath.Join(machineDirPath, XMLMachineDescriptionFilename)
 			if err := os.WriteFile(xmlMachineDescriptionPath, xmlMachineDescription, 0660); err != nil {
-				Logger.Error("cannot write the libvirt domain XML description in config dir", "machine", machine.Hostname, "path", xmlMachineDescriptionPath, "reason", err)
-				os.Exit(1)
+				// the xml configuration has been created but cannot be written on disk
+				// this is a warning and not an error since it does not prevent the machine
+				// to be created in libvirt
+				Logger.Warn("cannot write the libvirt domain XML description in config dir", "machine", machine.Hostname, "path", xmlMachineDescriptionPath, "reason", err.Error())
 			}
 
 			// create the machine in libvirt
 			if !dryRun {
+				// TODO first, create the libvirt networks
+				//Logger.Debug("create machine's networks")
+
+				// second, define the libvirt domain (machine not started yet)
 				domain, err := LibvirtConnexion.DomainDefineXML(string(xmlMachineDescription))
 				if err != nil {
-					Logger.Error("cannot define the machine from libvirt domain XML description", "machine", machine.Hostname, "reason", err)
+					Logger.Error("cannot define the machine from libvirt domain XML description", "machine", machine.Hostname, "reason", err.Error())
 					os.Exit(1)
 				}
+				// finally, create the domain (machine startup)
 				err = LibvirtConnexion.DomainCreate(domain)
 				if err != nil {
-					Logger.Error("cannot start the machine", "machine", machine.Hostname, "reason", err)
+					Logger.Error("cannot start the machine", "machine", machine.Hostname, "reason", err.Error())
 					os.Exit(1)
 				}
 			} else {
@@ -137,11 +160,6 @@ func init() {
 	machineCreateCmd.Flags().BoolVarP(&dryRun, "dry-run", "", false, "Generate all config files without creating the machine")
 }
 
-// getMachineDirByConf builds the machine directory path from its configuration
-func getMachineDirByConf(machine *configuration.FreyjaConfigurationMachine) string {
-	return filepath.Join(FreyjaMachinesWorkspaceDir, machine.Hostname)
-}
-
 // getMachineDirByName builds the machine directory path from its configuration
 func getMachineDirByName(machineName string) string {
 	return filepath.Join(FreyjaMachinesWorkspaceDir, machineName)
@@ -149,7 +167,7 @@ func getMachineDirByName(machineName string) string {
 
 // createMachineDir returns the created dir, or an error
 func createMachineDir(machine *configuration.FreyjaConfigurationMachine) (string, error) {
-	machineDirPath := getMachineDirByConf(machine)
+	machineDirPath := filepath.Join(FreyjaMachinesWorkspaceDir, machine.Hostname)
 	if _, err := os.Stat(machineDirPath); os.IsNotExist(err) {
 		if err := os.MkdirAll(machineDirPath, os.ModePerm); err != nil {
 			return "", err
@@ -165,7 +183,7 @@ func createOverlayImage(machine *configuration.FreyjaConfigurationMachine, rootI
 	if err != nil {
 		return "", fmt.Errorf("cannot read base image file '%s' : %w", machine.Image, err)
 	}
-	overlayFile := filepath.Join(machineDir, machine.Hostname+BackingImageFileSuffix)
+	overlayFile := filepath.Join(machineDir, BackingImageFilename)
 	opts[qcow2.OPT_SIZE] = machine.Storage << 30 //qcow2 file's size is 1g
 	opts[qcow2.OPT_FMT] = BackingImageFormat     //qcow2 format
 	opts[qcow2.OPT_SUBCLUSTER] = true            //enable sub-cluster

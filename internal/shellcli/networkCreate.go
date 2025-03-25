@@ -25,6 +25,11 @@ var networkCreateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		Logger.Debug("create networks from configuration file", "config", configurationPath)
 
+		// TODO
+		//  - test different usecases for network creation
+		//  - also test to ask for info from libvirt
+		//  -  test without a default nat configuration, but in my opinion, it needs to be generated
+		//     because it will conflict with the 'default' network
 		if err := createNetwork(); err != nil {
 			Logger.Error("cannot create networks", "reason", err.Error())
 			os.Exit(1)

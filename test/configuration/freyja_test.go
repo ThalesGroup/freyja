@@ -107,9 +107,10 @@ func replaceFirstConfFile(c *configuration.FreyjaConfiguration, f *configuration
 func TestValidate(t *testing.T) {
 	c := BuildCompleteConfig()
 	testValidateVersion(t, c)
-	testValidateNetwork(t, c)
-	testValidateUser(t, c)
-	testValidateFiles(t, c)
+	testValidateNetworks(t, c)
+	testValidateMachineNetwork(t, c)
+	testValidateMachineUser(t, c)
+	testValidateMachineFiles(t, c)
 }
 
 func testValidateVersion(t *testing.T, c *configuration.FreyjaConfiguration) {
@@ -133,7 +134,37 @@ func testValidateVersion(t *testing.T, c *configuration.FreyjaConfiguration) {
 	}
 }
 
-func testValidateNetwork(t *testing.T, c *configuration.FreyjaConfiguration) {
+func testValidateNetworks(t *testing.T, c *configuration.FreyjaConfiguration) {
+	for i, network := range c.Networks {
+		network.Name = ""
+		c.Networks[i] = network
+		if err := c.Validate(); err == nil {
+			t.Logf("network missing name did not raised an error")
+			t.Fail()
+		}
+		network.Name = "valid"
+
+		network.Dhcp.Start = ""
+		c.Networks[i] = network
+		if err := c.Validate(); err == nil {
+			t.Logf("network missing dhcp start of range did not raised an error")
+			t.Fail()
+		}
+		network.Dhcp.Start = "192.168.255.254"
+
+		network.Dhcp.End = ""
+		c.Networks[i] = network
+		if err := c.Validate(); err == nil {
+			t.Logf("network missing dhcp end of range did not raised an error")
+			t.Fail()
+		}
+
+		network.Dhcp.End = "192.168.255.255"
+		c.Networks[i] = network
+	}
+}
+
+func testValidateMachineNetwork(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationNetwork := c.Machines[0].Networks[0]
 	// invalid name value
 	// error should be raised here
@@ -149,7 +180,7 @@ func testValidateNetwork(t *testing.T, c *configuration.FreyjaConfiguration) {
 	replaceFirstConfNetwork(c, &configurationNetwork)
 	// invalid mac addresses
 	// errors should be raised here
-	values := []string{"001b:63:84:45:e6", "01:63:84:45:a", "001b638445e6", "xx:1b:63:84:45:e6", ""}
+	values := []string{"001b:63:84:45:e6", "01:63:84:45:a", "001b638445e6", "xx:1b:63:84:45:e6"}
 	for _, value := range values {
 		configurationNetwork.Mac = value
 		replaceFirstConfNetwork(c, &configurationNetwork)
@@ -173,7 +204,7 @@ func testValidateNetwork(t *testing.T, c *configuration.FreyjaConfiguration) {
 
 }
 
-func testValidateUser(t *testing.T, c *configuration.FreyjaConfiguration) {
+func testValidateMachineUser(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationUser := c.Machines[0].Users[0]
 	tempFile := internal2.WriteTempTestFile("test-valid-user-key.pub", "config", []byte("test"))
 	// invalid
@@ -192,7 +223,7 @@ func testValidateUser(t *testing.T, c *configuration.FreyjaConfiguration) {
 	}
 }
 
-func testValidateFiles(t *testing.T, c *configuration.FreyjaConfiguration) {
+func testValidateMachineFiles(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationFile := c.Machines[0].Files[0]
 
 	// SOURCE

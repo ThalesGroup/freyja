@@ -26,11 +26,8 @@ var networkCreateCmd = &cobra.Command{
 		Logger.Debug("create networks from configuration file", "config", configurationPath)
 
 		// TODO
-		//  - test different usecases for network creation
-		//  - also test to ask for info from libvirt
-		//  -  test without a default nat configuration, but in my opinion, it needs to be generated
-		//     because it will conflict with the 'default' network
-		if err := createNetwork(); err != nil {
+		//  - test different usecases for network and machine creation. see machine creation
+		if err := createNetwork(configurationPath); err != nil {
 			Logger.Error("cannot create networks", "reason", err.Error())
 			os.Exit(1)
 		}
@@ -47,15 +44,20 @@ func init() {
 	networkCreateCmd.Flags().BoolVarP(&dryRun, "dry-run", "", false, "Generate all config files without creating the machine")
 }
 
-func createNetwork() (err error) {
+func createNetwork(configPath string) (err error) {
 	// build config from path
 	var freyjaConfiguration configuration.FreyjaConfiguration
-	if err = freyjaConfiguration.BuildFromFile(configurationPath); err != nil {
-		return fmt.Errorf("cannot parse configuration file '%s': %w", configurationPath, err)
+	if err = freyjaConfiguration.BuildFromFile(configPath); err != nil {
+		return fmt.Errorf("cannot parse configuration file '%s': %w", configPath, err)
 	}
 
 	// create networks
-	for _, network := range freyjaConfiguration.Networks {
+	return createNetworkFromConfig(&freyjaConfiguration)
+}
+
+func createNetworkFromConfig(config *configuration.FreyjaConfiguration) (err error) {
+	// create networks
+	for _, network := range config.Networks {
 		// check if network already exists
 		// it prevents to update an existing network used by running machines and avoid
 		// unwanted side effects
@@ -114,9 +116,12 @@ func createNetwork() (err error) {
 				return err
 			}
 		} else if network.Name == foundNet.Name {
-			// if error is not nil and network exists, skip this one
-			Logger.Warn("skip creation : network already exists", "network", network.Name)
-			continue
+			// if error is not nil and network exists, stop installation
+			// this is on purpose because we do not want erroneous networks or machines targetting
+			// wrongly configured or non-existing networks to start booting.
+			// this behavior can be discussed.
+			Logger.Error("network already exists", "network", network.Name)
+			os.Exit(1)
 		}
 	}
 	return nil

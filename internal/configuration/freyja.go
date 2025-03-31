@@ -123,8 +123,8 @@ type FreyjaConfigurationFile struct {
 }
 
 type FreyjaConfigurationNetwork struct {
-	Name string                           `yaml:"name"`
-	Dhcp []FreyjaConfigurationNetworkDHCP `yaml:"dhcp,omitempty"`
+	Name string                         `yaml:"name"`
+	Dhcp FreyjaConfigurationNetworkDHCP `yaml:"dhcp,omitempty"`
 }
 
 type FreyjaConfigurationNetworkDHCP struct {
@@ -140,10 +140,13 @@ type Configuration interface {
 
 // Validate audits the whole freyja configuration for content mistakes
 // mistake = configuration value that may cause further issues during machine creation in libvirt
-func (c *FreyjaConfiguration) Validate() error {
+func (c *FreyjaConfiguration) Validate() (err error) {
 	// verify version
-	err := c.validateVersion()
-	if err != nil {
+	if err = c.validateVersion(); err != nil {
+		return err
+	}
+	// verify networks
+	if err = c.validateNetworks(); err != nil {
 		return err
 	}
 	// verify machines
@@ -154,7 +157,7 @@ func (c *FreyjaConfiguration) Validate() error {
 		if len(machine.Networks) != 0 {
 			// verify networks
 			for _, network := range machine.Networks {
-				err = network.validateNetwork()
+				err = network.validateMachineNetwork()
 				if err != nil {
 					return &internal.ConfigurationError{Message: err.Error()}
 				}
@@ -194,10 +197,29 @@ func (c *FreyjaConfiguration) validateVersion() error {
 	return nil
 }
 
+func (c *FreyjaConfiguration) validateNetworks() error {
+	for _, network := range c.Networks {
+		if network.Name == "" {
+			return fmt.Errorf("missing network name")
+		}
+		pNetworkDhcp := &network.Dhcp
+		if pNetworkDhcp == nil {
+			return fmt.Errorf("missing DHCP configuration for network '%s'", network.Name)
+		}
+		if network.Dhcp.Start == "" {
+			return fmt.Errorf("missing DHCP start of range for network '%s'", network.Name)
+		}
+		if network.Dhcp.End == "" {
+			return fmt.Errorf("missing DHCP end of range for network '%s'", network.Name)
+		}
+	}
+	return nil
+}
+
 // ValidateNetwork audits the network configuration including
 //   - the name of the network
 //   - the format of the mac address
-func (cn *FreyjaConfigurationMachineNetwork) validateNetwork() error {
+func (cn *FreyjaConfigurationMachineNetwork) validateMachineNetwork() error {
 	// network name
 	if cn.Name == "" {
 		return errors.New("network name is empty")

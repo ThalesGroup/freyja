@@ -18,7 +18,7 @@ var networkDeleteCmd = &cobra.Command{
 	TraverseChildren: true, // ensure local flags do not spread to sub commands
 
 	Run: func(cmd *cobra.Command, args []string) {
-		Logger.Warn("deletion of networks still in use may affect machines !")
+		Logger.Warn("deleting networks that are still in use may affect machines !")
 		var err error
 		if configurationPath != "" {
 			err = deleteNetworksByConf()

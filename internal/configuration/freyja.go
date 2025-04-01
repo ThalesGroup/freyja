@@ -6,6 +6,7 @@ import (
 	"freyja/internal"
 	"github.com/spf13/viper"
 	"log"
+	"net"
 	"path/filepath"
 	"regexp"
 )
@@ -123,14 +124,9 @@ type FreyjaConfigurationFile struct {
 }
 
 type FreyjaConfigurationNetwork struct {
-	Name string                         `yaml:"name"`
-	Dhcp FreyjaConfigurationNetworkDHCP `yaml:"dhcp,omitempty"`
-}
-
-type FreyjaConfigurationNetworkDHCP struct {
-	// DHCP range
-	Start string `yaml:"start"`
-	End   string `yaml:"end"`
+	Name string `yaml:"name"`
+	// cidr format must be ipv4 as in '255.255.255.255/24'
+	CIDR string `yaml:"cidr"`
 }
 
 type Configuration interface {
@@ -202,16 +198,17 @@ func (c *FreyjaConfiguration) validateNetworks() error {
 		if network.Name == "" {
 			return fmt.Errorf("missing network name")
 		}
-		pNetworkDhcp := &network.Dhcp
-		if pNetworkDhcp == nil {
-			return fmt.Errorf("missing DHCP configuration for network '%s'", network.Name)
+		if network.CIDR == "" {
+			return fmt.Errorf("missing network's CIDR")
 		}
-		if network.Dhcp.Start == "" {
-			return fmt.Errorf("missing DHCP start of range for network '%s'", network.Name)
+		ip, net, err := net.ParseCIDR(network.CIDR)
+		if err != nil {
+			return fmt.Errorf("wrong network's CIDR '%s': %w", network.CIDR, err)
 		}
-		if network.Dhcp.End == "" {
-			return fmt.Errorf("missing DHCP end of range for network '%s'", network.Name)
+		if ip == nil || net == nil {
+			return fmt.Errorf("cannot retrieve IP or Network values from network's cidr value '%s'", network.CIDR)
 		}
+
 	}
 	return nil
 }

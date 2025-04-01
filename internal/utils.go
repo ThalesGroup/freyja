@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
+	"net"
 	"os"
 )
 
@@ -116,4 +117,44 @@ func CopyFile(source string, destination string, destinationPermissions os.FileM
 		return fmt.Errorf("cannot write copy file '%s': %w", destination, err)
 	}
 	return nil
+}
+
+// NETWORK
+
+// CalculateSubnetInfo returns the addresses of the gateway, the netmask and the dhcp range
+// Example for subnet := "192.168.122.0/24"
+//
+// Subnet: 192.168.122.0/24
+// Gateway: 192.168.122.1
+// Netmask: 255.255.255.0
+// DHCP Range Start: 192.168.122.2
+// DHCP Range End: 192.168.122.254
+func CalculateSubnetInfo(cidr string) (gateway, netmask, dhcpStart, dhcpEnd string, err error) {
+	ip, ipNet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return "", "", "", "", fmt.Errorf("invalid CIDR : %v", err)
+	}
+
+	// get the netmask
+	//ones, _ := ipNet.Mask.Size()
+	//netmask = CIDRToNetmask(ones).String()
+	netmaskIp := net.IP(ipNet.Mask)
+
+	// Gateway = "first" ip of the network
+	gatewayIP := net.ParseIP(ip.String()).To4()
+	gatewayIP[3]++
+
+	// DHCP Start = Gateway + 1
+	dhcpStartIP := net.ParseIP(gatewayIP.String()).To4()
+	dhcpStartIP[3]++
+
+	// DHCP End = "last" address before broadcast
+	broadcastIP := net.ParseIP(ip.String()).To4()
+	for i := 0; i < 4; i++ {
+		broadcastIP[i] |= ^ipNet.Mask[i]
+	}
+	dhcpEndIP := net.ParseIP(broadcastIP.String()).To4()
+	dhcpEndIP[3]--
+
+	return gatewayIP.String(), netmaskIp.String(), dhcpStartIP.String(), dhcpEndIP.String(), nil
 }

@@ -157,3 +157,54 @@ func copyFileTest(t *testing.T, sourceFile string, destinationFile string) {
 		t.FailNow()
 	}
 }
+
+func TestNetworkParsing(t *testing.T) {
+	input := "192.168.122.0/24"
+	expectedGateway := "192.168.122.1"
+	expectedNetmask := "255.255.255.0"
+	expectedDHCPstart := "192.168.122.2"
+	expectedDHCPend := "192.168.122.254"
+
+	gateway, netmask, start, end, err := internal.CalculateSubnetInfo(input)
+	if err != nil {
+		t.Logf("cannot calculate gateway, netmask, dhcp start and end addresses from input '%s': %v", input, err)
+		t.Fail()
+	} else {
+		if gateway != expectedGateway {
+			t.Logf("unexpected gateway address is '%s' instead of '%s'", gateway, expectedGateway)
+		}
+		if netmask != expectedNetmask {
+			t.Logf("unexpected netmask address is '%s' instead of '%s'", netmask, expectedNetmask)
+		}
+		if start != expectedDHCPstart {
+			t.Logf("unexpected dhcp start address is '%s' instead of '%s'", start, expectedDHCPstart)
+		}
+		if end != expectedDHCPend {
+			t.Logf("unexpected dhcp end address is '%s' instead of '%s'", end, expectedDHCPend)
+		}
+	}
+
+	input = "192.168.0.0/16"
+	expectedGateway = "192.168.0.1"
+	expectedNetmask = "255.255.0.0"
+	expectedDHCPstart = "192.168.0.2"
+	expectedDHCPend = "192.168.255.254"
+	gateway, netmask, start, end, err = internal.CalculateSubnetInfo(input)
+	if err != nil {
+		t.Logf("cannot calculate gateway, netmask, dhcp start and end addresses from input '%s': %v", input, err)
+		t.Fail()
+	} else {
+		if gateway != expectedGateway {
+			t.Logf("unexpected gateway address is '%s' instead of '%s'", gateway, expectedGateway)
+		}
+		if netmask != expectedNetmask {
+			t.Logf("unexpected netmask address is '%s' instead of '%s'", netmask, expectedNetmask)
+		}
+		if start != expectedDHCPstart {
+			t.Logf("unexpected dhcp start address is '%s' instead of '%s'", start, expectedDHCPstart)
+		}
+		if end != expectedDHCPend {
+			t.Logf("unexpected dhcp end address is '%s' instead of '%s'", end, expectedDHCPend)
+		}
+	}
+}

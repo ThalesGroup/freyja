@@ -5,6 +5,7 @@ import (
 	b64 "encoding/base64"
 	"encoding/xml"
 	"fmt"
+	"freyja/internal"
 	"github.com/google/uuid"
 	"os"
 )
@@ -704,10 +705,23 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 //
 // </network>
 func CreateLibvirtNetworkXMLDescription(networkConfiguration FreyjaConfigurationNetwork) (data []byte, err error) {
+	gateway, netmask, dhcpStart, dhcpEnd, err := internal.CalculateSubnetInfo(networkConfiguration.CIDR)
+	xmlNetworkDescriptionIp := &XMLNetworkDescriptionIp{
+		Address: gateway,
+		Netmask: netmask,
+		Dhcp: &XMLNetworkDescriptionIpDhcp{
+			Range: &XMLNetworkDescriptionIpDhcpRange{
+				Start: dhcpStart,
+				End:   dhcpEnd,
+			},
+		},
+	}
 
 	xmlNetworkDescription := XMLNetworkDescription{
 		Name: networkConfiguration.Name,
+		Ip:   xmlNetworkDescriptionIp,
 	}
+
 	//UUID:    internal.GenerateUUID(),
 	//Forward: &XMLNetworkDescriptionForward{
 	//	Mode: string(NetworkForwardModeNat),

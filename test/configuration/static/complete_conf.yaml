@@ -2,13 +2,9 @@
 version: v0.1.0-beta
 networks:
   - name: ctrl-plane
-    dhcp:
-      start: 192.168.123.3
-      end: 192.168.123.253
+    cidr: 192.168.123.0/24
   - name: data-plane
-    dhcp:
-      start: 192.168.124.3
-      end: 192.168.124.253
+    cidr: 192.168.124.0/24
 machines:
   - image: "/tmp/CentOS-Stream-GenericCloud-8-20210603.0.x86_64.qcow2" # MANDATORY
     os: "centos8" # MANDATORY

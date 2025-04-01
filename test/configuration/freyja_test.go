@@ -142,24 +142,19 @@ func testValidateNetworks(t *testing.T, c *configuration.FreyjaConfiguration) {
 			t.Logf("network missing name did not raised an error")
 			t.Fail()
 		}
-		network.Name = "valid"
+		network.Name = "valid" // make it valid again
 
-		network.Dhcp.Start = ""
-		c.Networks[i] = network
-		if err := c.Validate(); err == nil {
-			t.Logf("network missing dhcp start of range did not raised an error")
-			t.Fail()
+		invalidValues := []string{"", "aosidfiabjk", "10.11.12.1", "12.12.12.12.12/24"}
+		for _, value := range invalidValues {
+			network.CIDR = value
+			c.Networks[i] = network
+			if err := c.Validate(); err == nil {
+				t.Logf("invalid dhcp start of range did not raised an error for value: %s", value)
+				t.Fail()
+			}
+
 		}
-		network.Dhcp.Start = "192.168.255.254"
-
-		network.Dhcp.End = ""
-		c.Networks[i] = network
-		if err := c.Validate(); err == nil {
-			t.Logf("network missing dhcp end of range did not raised an error")
-			t.Fail()
-		}
-
-		network.Dhcp.End = "192.168.255.255"
+		network.CIDR = "192.168.123.0/24" // make it valid again
 		c.Networks[i] = network
 	}
 }

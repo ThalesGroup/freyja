@@ -45,6 +45,7 @@ var machineCreateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		Logger.Debug("create machines from configuration file", "config", configurationPath)
 		// TODO :
+		//   - dry-run dont dump xml configuration for networks
 		//	 - test different usecases for network and machine creation.
 		//		currently, the network creation does not take dhcp conf into account. Fix it.
 		//		you can check this by dumping the net-info xml from virsh.
@@ -129,14 +130,21 @@ var machineCreateCmd = &cobra.Command{
 				Logger.Warn("cannot write the libvirt domain XML description in config dir", "machine", machine.Hostname, "path", xmlMachineDescriptionPath, "reason", err.Error())
 			}
 
+			// create network configuration
+			//xmlNetworkDescriptions, err := GenerateLibvirtNetworksXMLDescriptions(&freyjaConfiguration)
+			//if err != nil {
+			//	Logger.Error("cannot create the libvirt networks xml descriptions from configuration", "reason", err.Error())
+			//	os.Exit(1)
+			//}
+
 			// create the machine in libvirt
 			if !dryRun {
 				// TODO first, create the libvirt networks
 				Logger.Debug("create machine's networks")
 				// the network is not pushed in libvirt if --dry-run command is used
-				if err = createNetworkFromConfig(&freyjaConfiguration); err != nil {
-					Logger.Error("cannot create the machine's networks", "machine", machine.Hostname, "reason", err.Error())
-				}
+				//if err = createNetworkFromConfig(&freyjaConfiguration); err != nil {
+				//	Logger.Error("cannot create the machine's networks", "machine", machine.Hostname, "reason", err.Error())
+				//}
 
 				// second, define the libvirt domain (machine not started yet)
 				domain, err := LibvirtConnexion.DomainDefineXML(string(xmlMachineDescription))

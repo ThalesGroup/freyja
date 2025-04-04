@@ -58,8 +58,9 @@ func init() {
 	networkCreateCmd.Flags().BoolVarP(&dryRun, "dry-run", "", false, "Generate all config files without creating the machine")
 }
 
-func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfiguration) (xmlDescriptions [][]byte, err error) {
+func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfiguration) (xmlDescriptions map[string][]byte, err error) {
 	// create networks
+	xmlDescriptions = make(map[string][]byte, len(config.Networks))
 	for _, network := range config.Networks {
 		// check first if network already exists in libvirt
 		// it prevents to update and overwrite an existing network config that is already used by
@@ -73,7 +74,7 @@ func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfigur
 				Logger.Debug("create network dir", "network", network.Name, "parent", FreyjaNetworksWorkspaceDir)
 				networkDirPath, err := createNetworkDir(&network)
 				if err != nil {
-					return nil, fmt.Errorf("cannot create network '%s' workspace directory in '%s': %w", networkName, networkDirPath, err)
+					return nil, fmt.Errorf("cannot create network '%s' workspace directory in '%s': %w", network.Name, networkDirPath, err)
 				}
 
 				// create libvirt network configuration
@@ -93,7 +94,7 @@ func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfigur
 					Logger.Warn("cannot write libvirt network XML description", "network", network.Name, "path", xmlNetworkDescriptionPath, "reason", err.Error())
 				}
 				// add it in the result
-				xmlDescriptions = append(xmlDescriptions, xmlDescription)
+				xmlDescriptions[network.Name] = xmlDescription
 				// otherwise, the error is unexpected
 			} else {
 				return nil, err
@@ -101,25 +102,25 @@ func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfigur
 		} else if network.Name == foundNet.Name {
 			// if error is not nil and network exists, we do not overwrite its configuration file,
 			// and we will not create it in libvirt, excluding it from the returned configs.
-			// In this case, we abort the command execution because we do not want to continue
-			// on machine installations that relies on a bad configuration of networks.
+			// In this case, we do not abort the command execution.
+			// If machines are created, they will boot on top of the existing networks.
 			// This behavior can be discussed
-			Logger.Error("network already exists", "network", network.Name)
-			os.Exit(1)
+			Logger.Warn("network already exists", "network", network.Name)
 		}
 	}
 	return xmlDescriptions, nil
 }
 
-func CreateNetworksInLibvirt(xmlDescriptions [][]byte) error {
-	for _, desc := range xmlDescriptions {
-		Logger.Debug("define network in libvirt from xml description")
+func CreateNetworksInLibvirt(xmlDescriptions map[string][]byte) error {
+
+	for name, desc := range xmlDescriptions {
+		Logger.Debug("create network in Libvirt from xml descriptions", "network", name)
+
 		net, err := LibvirtConnexion.NetworkDefineXML(string(desc))
 		if err != nil {
 			return fmt.Errorf("cannot define network in libvirt from xml description: %w", err)
 		}
 
-		Logger.Debug("create network in Libvirt from xml description", "network")
 		if err = LibvirtConnexion.NetworkCreate(net); err != nil {
 			return fmt.Errorf("cannot create network in libvirt: %w", err)
 		}

@@ -8,7 +8,7 @@ import (
 	"os"
 )
 
-var networkName string
+var networkNames []string
 
 // commands definitions
 var networkDeleteCmd = &cobra.Command{
@@ -22,13 +22,12 @@ var networkDeleteCmd = &cobra.Command{
 		var err error
 		if configurationPath != "" {
 			err = deleteNetworksByConf()
-		} else if networkName != "" {
-			Logger.Info("delete network", "name", networkName)
-			err = deleteNetworkByName(networkName)
-		}
+		} else if networkNames != nil {
+			err = deleteNetworksByName(networkNames)
+			if err != nil {
+				Logger.Error("cannot delete networks", "reason", err.Error())
+			}
 
-		if err != nil {
-			Logger.Error("cannot delete networks", "reason", err.Error())
 		}
 
 	},
@@ -36,11 +35,11 @@ var networkDeleteCmd = &cobra.Command{
 
 func init() {
 	// names are used to delete the networks provided by name
-	networkDeleteCmd.Flags().StringVarP(&networkName, "name", "n", "", "Name of the network to delete.")
+	networkDeleteCmd.Flags().StringArrayVarP(&networkNames, "name", "n", nil, "Name of the network to delete. Repeat this flag to delete multiple networks.")
 	// configuration is used to delete all the network contains in this configuration
 	networkDeleteCmd.Flags().StringVarP(&configurationPath, "config", "c", "", "Path to the configuration file to delete all the networks described in it.")
 
-	if &networkName == nil && &configurationPath == nil {
+	if &networkNames == nil && &configurationPath == nil {
 		Logger.Error("canceled: you must provide at least '-n' or '-c' arguments")
 		os.Exit(1)
 	}
@@ -59,36 +58,33 @@ func deleteNetworksByConf() (err error) {
 	for i, network := range freyjaConfiguration.Networks {
 		networksToDelete[i] = network.Name
 	}
+
 	// delete network one by one after confirmation
-	Logger.Info("delete networks", "names", networksToDelete)
-	for _, name := range networksToDelete {
-		if err = deleteNetworkByName(name); err != nil {
-			return err
-		}
-	}
-	return nil
+	return deleteNetworksByName(networksToDelete)
 }
 
-func deleteNetworkByName(name string) (err error) {
+func deleteNetworksByName(names []string) (err error) {
+	Logger.Info("delete networks", "names", names)
 
 	if internal.AskUserYesNoConfirmation() {
-		// find
-		network, err := LibvirtConnexion.NetworkLookupByName(name)
-		if err != nil {
-			return fmt.Errorf("cannot find network '%s': %w", name, err)
-		}
+		for _, name := range names {
+			network, err := LibvirtConnexion.NetworkLookupByName(name)
+			if err != nil {
+				return fmt.Errorf("cannot find network '%s': %w", name, err)
+			}
 
-		// destroy
-		if err := LibvirtConnexion.NetworkDestroy(network); err != nil {
-			return fmt.Errorf("cannot destroy network '%s': %w", name, err)
-		}
+			// destroy
+			if err := LibvirtConnexion.NetworkDestroy(network); err != nil {
+				return fmt.Errorf("cannot destroy network '%s': %w", name, err)
+			}
 
-		// undefine
-		if err := LibvirtConnexion.NetworkUndefine(network); err != nil {
-			return fmt.Errorf("cannot undefine network '%s': %w", name, err)
-		}
+			// undefine
+			if err := LibvirtConnexion.NetworkUndefine(network); err != nil {
+				return fmt.Errorf("cannot undefine network '%s': %w", name, err)
+			}
 
-		Logger.Info("Network deleted", "network", name)
+			Logger.Info("Network deleted", "network", name)
+		}
 	} else {
 		Logger.Info("Canceled")
 	}

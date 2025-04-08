@@ -316,7 +316,7 @@ type XMLDomainDescriptionDevicesDisk struct {
 	Device       string                                       `xml:"device,attr"`
 	Type         string                                       `xml:"type,attr"`
 	Source       *XMLDomainDescriptionDevicesDiskSource       `xml:"source"`
-	BackingStore *XMLDomainDescriptionDevicesDiskBackingStore `xml:"backingStore"`
+	BackingStore *XMLDomainDescriptionDevicesDiskBackingStore `xml:"backingStore,omitempty"`
 	Target       *XMLDomainDescriptionDevicesDiskTarget       `xml:"target"`
 	Address      *XMLDomainDescriptionDevicesDiskAddress      `xml:"address,omitempty"`
 }
@@ -553,17 +553,25 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 	//  for now, no metadata for os info part
 
 	// live image device
-	//        <disk type="file" device="disk">
-	//            <driver name="qemu" type="qcow2"/>
-	//            <source file="/home/kaio/Projects/thales/freyja/test/manual/debian-12-generic-amd64.qcow2"/>
-	//            <target dev="hda" bus="ide"/>
-	//        </disk>
-	//        <disk type="file" device="cdrom">
-	//            <driver name="qemu" type="raw"/>
-	//            <source file="/home/kaio/Projects/thales/freyja/test/manual/debian12-cloud-init.iso"/>
-	//            <target dev="hdb" bus="ide"/>
-	//            <readonly/>
-	//        </disk>
+	//    <disk device="disk" type="file">
+	//      <driver name="qemu" type="qcow2"/>
+	//      <source file="/home/user/.freyja/machines/vm1/overlay-image.qcow2"/>
+	//      <backingStore type="file">
+	//        <format type="qcow2"/>
+	//        <source file="/tmp/debian-12-generic-amd64.qcow2"/>
+	//      </backingStore>
+	//      <target bus="ide" dev="hda"/>
+	//    </disk>
+	//    <disk device="cdrom" type="file">
+	//      <driver name="qemu" type="raw"/>
+	//      <source file="/home/user/.freyja/machines/vm1/cloud-init.iso"/>
+	//      <target bus="ide" dev="hdb"/>
+	//    </disk>
+	//
+	// For the first boot, we directly create a backing storage as the root image and use
+	// the overlay file as the source image of the machine.
+	// It acts like we already did a snapshot.
+	// It allows multiple machines to use the same root image and boot on their own disk overlay.
 	liveImageDevice := XMLDomainDescriptionDevicesDisk{
 		Device: string(DiskDeviceType),
 		Type:   string(FileDeviceDiskType),
@@ -571,8 +579,18 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 			Name: string(QemuDeviceDiskDriverName),
 			Type: string(QcowDeviceDiskDriverType),
 		},
+		// !!! WARNING : The order of disk image chain in libvirt is :
+		//    <disk>
+		//      <source file="snapshot2"/>
+		//      <backingStore>
+		//        <source file="snapshot1"/>
+		//        <backingStore>
+		//          <source file="root-image"/>
+		//        </backingStore>
+		//      </backingStore>
+		//    </disk>
 		Source: &XMLDomainDescriptionDevicesDiskSource{
-			File: overlayFile,
+			File: os.ExpandEnv(overlayFile),
 		},
 		BackingStore: &XMLDomainDescriptionDevicesDiskBackingStore{
 			Type: string(FileDeviceDiskType),
@@ -580,8 +598,7 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 				Type: string(QcowDeviceDiskDriverType),
 			},
 			Source: &XMLDomainDescriptionDevicesDiskBackingStoreSource{
-				//File: overlayFile,
-				File: os.ExpandEnv(cm.Image),
+				File: cm.Image,
 			},
 		},
 		Target: &XMLDomainDescriptionDevicesDiskTarget{

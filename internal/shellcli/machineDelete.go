@@ -36,8 +36,13 @@ var machineDeleteCmd = &cobra.Command{
 		if internal.AskUserYesNoConfirmation() {
 			// stop libvirt domain
 			if err = LibvirtConnexion.DomainDestroy(domain); err != nil {
-				Logger.Error("cannot stop the machines", "machines", deleteDomainName, "reason", err)
-				os.Exit(1)
+				if strings.Contains(err.Error(), "domain is not running") {
+					Logger.Warn("skipped machine forced shutdown: machine is not running", "machine", deleteDomainName)
+				} else {
+					Logger.Error("cannot stop the machines", "machines", deleteDomainName, "reason", err)
+					os.Exit(1)
+				}
+
 			}
 			// undefine libvirt domain
 			if err = LibvirtConnexion.DomainUndefine(domain); err != nil {

@@ -1,9 +1,9 @@
 ---
 version: v0.1.0-beta
 networks:
-  - name: ctrl-plane
+  - name: ctrlplane
     cidr: 192.168.123.0/24
-  - name: data-plane
+  - name: dataplane
     cidr: 192.168.124.0/24
 machines:
   - image: "/tmp/CentOS-Stream-GenericCloud-8-20210603.0.x86_64.qcow2" # MANDATORY
@@ -20,8 +20,8 @@ machines:
         password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # MANDATORY, here 'master'
         sudo: true
         keys: # Optional, default '$HOME/.ssh/id_rsa.pub'
-          - "/tmp/freyja-unit-test/config/sam.pub"
-          - "/tmp/freyja-unit-test/config/ext.pub"
+          - "/tmp/freyja-unit-test/common/sam.pub"
+          - "/tmp/freyja-unit-test/common/ext.pub"
         groups: ["group1", "group2"]
       - name: "frodo" # MANDATORY
         password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # MANDATORY, here 'master'
@@ -33,11 +33,11 @@ machines:
       - "echo 'hello world !' > /tmp/test.txt"
       - "cat /tmp/test.txt"
     files:
-      - source: "/tmp/freyja-unit-test/config/hello.txt"
+      - source: "/tmp/freyja-unit-test/common/hello.txt"
         destination: "/root/hello.txt"
         permissions : "0700"
         owner: "root:freyja"
-      - source: "/tmp/freyja-unit-test/config/world.txt"
+      - source: "/tmp/freyja-unit-test/common/world.txt"
         destination: "/home/sam/world.txt"
     update: true
     reboot: true

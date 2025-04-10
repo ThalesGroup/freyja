@@ -10,7 +10,8 @@ import (
 
 var networkNames []string
 
-// commands definitions
+// networkDeleteCmd delete a list of networks from names provided in input or from a Freyja config
+// file
 var networkDeleteCmd = &cobra.Command{
 	Use:              "delete",
 	Short:            "Virtual network deletion",
@@ -45,6 +46,8 @@ func init() {
 	}
 }
 
+// deleteNetworksByConf gets the configuration file in input and delete all the network set inside
+// using Libvirt
 func deleteNetworksByConf() (err error) {
 	// build config from path
 	var freyjaConfiguration configuration.FreyjaConfiguration
@@ -63,6 +66,7 @@ func deleteNetworksByConf() (err error) {
 	return deleteNetworksByName(networksToDelete)
 }
 
+// deleteNetworksByName takes a list of network names and delete them in Libvirt
 func deleteNetworksByName(names []string) (err error) {
 	Logger.Info("delete networks", "names", names)
 

@@ -15,7 +15,8 @@ import (
 // source : https://lists.libvirt.org/archives/list/devel@lists.libvirt.org/message/VTZOSYUKTVG3YXGFXOKJS5SLR2VFMMLS/
 var RemoteProcNetworkSetAutostart int32 = 48
 
-// commands definitions
+// networkCreateCmd creates a new network in libvirt by generating its configuration in xml format,
+// defines it in libvirt then create it
 var networkCreateCmd = &cobra.Command{
 	Use:              "create",
 	Short:            "Network creation",
@@ -32,7 +33,7 @@ var networkCreateCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		xmlDescriptions, err := GenerateLibvirtNetworksXMLDescriptions(&freyjaConfiguration)
+		xmlDescriptions, err := GenerateLibvirtNetworksXMLDescriptions(&freyjaConfiguration, FreyjaNetworksWorkspaceDir)
 		if err != nil {
 			Logger.Error("cannot generate networks XML descriptions for Libvirt", "reason", err.Error())
 			os.Exit(1)
@@ -58,7 +59,16 @@ func init() {
 	networkCreateCmd.Flags().BoolVarP(&dryRun, "dry-run", "", false, "Generate all config files without creating the machine")
 }
 
-func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfiguration) (xmlDescriptions map[string][]byte, err error) {
+func GetLibvirtNetworkDescriptionPath(networkName string) (path string) {
+	networkDir := filepath.Join(FreyjaNetworksWorkspaceDir, networkName)
+	filename := fmt.Sprintf("%s%s%s", XMLNetworkDescriptionPrefix, networkName, XMLNetworkDescriptionSuffix)
+	return filepath.Join(networkDir, filename)
+}
+
+// GenerateLibvirtNetworksXMLDescriptions create the network configurations for libvirt and dump
+// them on disk in xml format, inside their dedicated directory.
+// Returns the dumped configurations.
+func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfiguration, networksDir string) (xmlDescriptions map[string][]byte, err error) {
 	// create networks
 	xmlDescriptions = make(map[string][]byte, len(config.Networks))
 	for _, network := range config.Networks {
@@ -70,11 +80,15 @@ func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfigur
 			// ignore error only if it contains the message that the network does not exist
 			// which is the purpose of this command
 			if strings.Contains(err.Error(), "not found") {
+
 				// create network directory
-				Logger.Debug("create network dir", "network", network.Name, "parent", FreyjaNetworksWorkspaceDir)
-				networkDirPath, err := createNetworkDir(&network)
-				if err != nil {
-					return nil, fmt.Errorf("cannot create network '%s' workspace directory in '%s': %w", network.Name, networkDirPath, err)
+				Logger.Debug("create network dir", "network", network.Name, "parent", networksDir)
+				xmlNetworkDescriptionPath := GetLibvirtNetworkDescriptionPath(network.Name)
+				networkDir := filepath.Dir(xmlNetworkDescriptionPath)
+				if _, err := os.Stat(networkDir); os.IsNotExist(err) {
+					if err := os.MkdirAll(networkDir, os.ModePerm); err != nil {
+						return nil, err
+					}
 				}
 
 				// create libvirt network configuration
@@ -85,18 +99,20 @@ func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfigur
 				if xmlDescription, err = configuration.CreateLibvirtNetworkXMLDescription(network); err != nil {
 					return nil, fmt.Errorf("cannot create the libvirt XML description for network '%s': %w", network.Name, err)
 				}
-				filename := fmt.Sprintf("%s%s%s", XMLNetworkDescriptionPrefix, network.Name, XMLNetworkDescriptionSuffix)
-				xmlNetworkDescriptionPath := filepath.Join(networkDirPath, filename)
+
+				// dump configuration on disk
 				if err = configuration.DumpNetworkConfig(xmlDescription, xmlNetworkDescriptionPath); err != nil {
 					// the xml configuration has been created but cannot be written on disk
 					// this is a warning and not an error since it does not prevent the network
 					// to be created in libvirt
 					Logger.Warn("cannot write libvirt network XML description", "network", network.Name, "path", xmlNetworkDescriptionPath, "reason", err.Error())
 				}
+
 				// add it in the result
 				xmlDescriptions[network.Name] = xmlDescription
-				// otherwise, the error is unexpected
+
 			} else {
+				// otherwise, the error is unexpected
 				return nil, err
 			}
 		} else if network.Name == foundNet.Name {
@@ -111,6 +127,8 @@ func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfigur
 	return xmlDescriptions, nil
 }
 
+// CreateNetworksInLibvirt get the Libvirt's xml description (configuration) of a network and
+// define it then create it in libvirt.
 func CreateNetworksInLibvirt(xmlDescriptions map[string][]byte) error {
 
 	for name, desc := range xmlDescriptions {
@@ -130,15 +148,4 @@ func CreateNetworksInLibvirt(xmlDescriptions map[string][]byte) error {
 		}
 	}
 	return nil
-}
-
-// createMachineDir returns the created dir, or an error
-func createNetworkDir(network *configuration.FreyjaConfigurationNetwork) (string, error) {
-	networkDirPath := filepath.Join(FreyjaNetworksWorkspaceDir, network.Name)
-	if _, err := os.Stat(networkDirPath); os.IsNotExist(err) {
-		if err := os.MkdirAll(networkDirPath, os.ModePerm); err != nil {
-			return "", err
-		}
-	}
-	return networkDirPath, nil
 }

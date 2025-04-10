@@ -7,6 +7,8 @@ import (
 	"github.com/google/uuid"
 	"net"
 	"os"
+	"regexp"
+	"strconv"
 )
 
 // Prompt
@@ -157,4 +159,28 @@ func CalculateSubnetInfo(cidr string) (gateway, netmask, dhcpStart, dhcpEnd stri
 	dhcpEndIP[3]--
 
 	return gatewayIP.String(), netmaskIp.String(), dhcpStartIP.String(), dhcpEndIP.String(), nil
+}
+
+// GetLibvirtInterfaceSlotAddressFromIndex returns the slot address in format '0x0i', usable in
+// libvirt xml configurations, where i is the index provided in input
+func GetLibvirtInterfaceSlotAddressFromIndex(index int) string {
+	return fmt.Sprintf("0x0%d", index)
+}
+
+// GetMachineInterfaceFromSlotAddress  converts libvirt slot addresses like '0x03' or '0x7d' to
+// interface name like 'enp0s3' or 'enp0s125'.
+func GetMachineInterfaceFromSlotAddress(slotAddress string) (string, error) {
+	re := regexp.MustCompile(`0x([0-9a-fA-F]+)`)
+	matches := re.FindStringSubmatch(slotAddress)
+	if len(matches) != 2 {
+		return "", fmt.Errorf("aucune valeur hex trouvée")
+	}
+
+	// Converts the hexa to int
+	value, err := strconv.ParseInt(matches[1], 16, 64)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert hexa '%s' to int: %w", matches[1], err)
+	}
+
+	return fmt.Sprintf("enp0s%d", value), nil
 }

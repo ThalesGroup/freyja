@@ -9,6 +9,7 @@ bin
 .dist
 .run
 dist
+troubleshooting.md
 
 # python
 **/__pycache__/

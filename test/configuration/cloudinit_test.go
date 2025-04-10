@@ -2,7 +2,6 @@ package configuration
 
 import (
 	"bytes"
-	"embed"
 	"errors"
 	"freyja/internal"
 	"freyja/internal/configuration"
@@ -11,11 +10,6 @@ import (
 	"path/filepath"
 	"testing"
 )
-
-// testFilesDir
-//
-//go:embed static/*
-var testFilesCloudInitDir embed.FS
 
 const testFileCloudInitDefaultMetadata string = "static/cloudinit_default_metadata.yaml"
 
@@ -38,7 +32,7 @@ const cloudInitTestDirname = "cloudinit"
 // TestBuildMetadataCloudInitConfig test if the built cloud init metadata model, from a machine
 // config data model, is valid
 func TestBuildMetadataCloudInitConfig(t *testing.T) {
-	c := BuildCompleteConfig()
+	c := internalTest.BuildCompleteConfig(testFileValidCompleteConfiguration)
 	var ci configuration.CloudInitMetadata
 	// test for second machine
 	// get only the minimum required for machine config
@@ -65,7 +59,7 @@ func TestBuildMetadataCloudInitConfig(t *testing.T) {
 // TestBuildUserDataCloudInitDefaultConfig checks the cloud init user data model for values
 // automatically set or by default
 func TestBuildUserDataCloudInitDefaultConfig(t *testing.T) {
-	c := BuildDefaultConfig()
+	c := internalTest.BuildConfig(testFileValidDefaultConfiguration)
 	var ci configuration.CloudInitUserData
 	// test for second machine
 	// get only the minimum required for machine config
@@ -153,7 +147,7 @@ func TestBuildUserDataCloudInitDefaultConfig(t *testing.T) {
 // TestBuildUserDataCloudInitDefaultConfig checks the cloud init user data model all the values
 // that can be set in a configuration
 func TestBuildUserDataCloudInitCompleteConfig(t *testing.T) {
-	c := BuildCompleteConfig()
+	c := internalTest.BuildCompleteConfig(testFileValidCompleteConfiguration)
 	var ci configuration.CloudInitUserData
 	// test for first machine
 	if err := ci.Build(&c.Machines[0]); err != nil {
@@ -220,7 +214,7 @@ func TestBuildUserDataCloudInitCompleteConfig(t *testing.T) {
 		t.Errorf("Expected file encoding '%s' but got '%s'", configuration.CloudInitUserDataFilesEncoding, f1.Encoding)
 		t.Fail()
 	}
-	expectedF1Content := internal.EncodeB64Bytes([]byte(ExpectedHelloFileContent))
+	expectedF1Content := internal.EncodeB64Bytes([]byte(internalTest.ExpectedHelloFileContent))
 	if f1.Content != expectedF1Content {
 		t.Errorf("Wrong file 1 content")
 		t.Fail()
@@ -296,7 +290,7 @@ func TestGenerateCloudInitConfigs(t *testing.T) {
 		expectedMetadata: testFileCloudInitDefaultMetadata,
 		expectedUserdata: testFileCloudInitDefaultUserData,
 	}
-	c := BuildDefaultConfig()
+	c := internalTest.BuildConfig(testFileValidDefaultConfiguration)
 	testGeneratedDefaultCloudInitConfigs(t, "TestGenerateDefaultCloudInitConfigs", c, expectedDefaultFiles)
 
 	// complete configuration
@@ -309,7 +303,7 @@ func TestGenerateCloudInitConfigs(t *testing.T) {
 		expectedMetadata: testFileCloudInitCompleteMetadataVm2,
 		expectedUserdata: testFileCloudInitCompleteUserDataVm2,
 	}
-	c = BuildCompleteConfig()
+	c = internalTest.BuildCompleteConfig(testFileValidCompleteConfiguration)
 	testGeneratedDefaultCloudInitConfigs(t, "TestGenerateCompleteCloudInitConfigs", c, expectedCompleteFiles)
 }
 

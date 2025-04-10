@@ -40,6 +40,8 @@ type DeviceDiskTargetDev string
 
 type DeviceInterfaceType string
 
+type DeviceInterfaceAddressType string
+
 type DeviceSerialType string
 
 type DeviceSerialTargetType string
@@ -109,6 +111,10 @@ const (
 )
 
 const (
+	PciDeviceInterfaceAddressType DeviceInterfaceAddressType = "pci"
+)
+
+const (
 	// NetworkForwardModeNat default
 	NetworkForwardModeNat NetworkForwardMode = "nat"
 	// NetworkForwardModeRoute when user input includes a host's target interface for guests net
@@ -142,6 +148,8 @@ const DefaultDeviceInterfaceType = string(NetworkDeviceInterfaceType)
 const DefaultNetworkForwardMode = string(NetworkForwardModeNat)
 
 const DefaultInterfaceSourceBridge string = "virbr0"
+
+const DefaultInterfaceAddressType string = string(PciDeviceInterfaceAddressType)
 
 const DefaultInterfaceModelType string = "virtio"
 
@@ -373,15 +381,21 @@ type XMLDomainDescriptionDevicesDiskAddress struct {
 //	    <target dev="vnet0"/>
 //	    <model type="virtio"/>
 //	    <alias name="net0"/>
-//	    <address bus="0x01" domain="0x0000" function="0x0" slot="0x00" type="pci"/>
+//	    <address slot="0x02" type="pci"/>
 //	</interface>
+//
+// !! WARNING : the address entry is very important to push in libvirt because it defines the order
+// of the interfaces mounted in the VM.
+// For example, slot="0x02" will define the "enp0s2" interface,
+// the slot="0x03" the interface enp0s3, and so on ...
 type XMLDomainDescriptionDevicesInterface struct {
-	XMLName xml.Name                                    `xml:"interface"`
-	Type    string                                      `xml:"type,attr"`
-	Mac     *XMLDomainDescriptionDevicesInterfaceMac    `xml:"mac"`
-	Source  *XMLDomainDescriptionDevicesInterfaceSource `xml:"source"`
-	Target  *XMLDomainDescriptionDevicesInterfaceTarget `xml:"target"`
-	Model   *XMLDomainDescriptionDevicesInterfaceModel  `xml:"model"`
+	XMLName xml.Name                                     `xml:"interface"`
+	Type    string                                       `xml:"type,attr"`
+	Mac     *XMLDomainDescriptionDevicesInterfaceMac     `xml:"mac"`
+	Source  *XMLDomainDescriptionDevicesInterfaceSource  `xml:"source"`
+	Target  *XMLDomainDescriptionDevicesInterfaceTarget  `xml:"target"`
+	Model   *XMLDomainDescriptionDevicesInterfaceModel   `xml:"model"`
+	Address *XMLDomainDescriptionDevicesInterfaceAddress `xml:"address"`
 }
 
 type XMLDomainDescriptionDevicesInterfaceMac struct {
@@ -403,6 +417,12 @@ type XMLDomainDescriptionDevicesInterfaceTarget struct {
 type XMLDomainDescriptionDevicesInterfaceModel struct {
 	XMLName xml.Name `xml:"model"`
 	Type    string   `xml:"type,attr"`
+}
+
+type XMLDomainDescriptionDevicesInterfaceAddress struct {
+	XMLName xml.Name `xml:"address"`
+	Type    string   `xml:"type,attr"`
+	Slot    string   `xml:"slot,attr"`
 }
 
 // XMLDomainDescriptionDevicesConsole
@@ -639,6 +659,7 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 	//        <interface type="network">
 	//            <mac address="52:54:00:17:49:b7"/>
 	//            <source network="default"/>
+	//            <address type="pci" slot="0x02"/>
 	//        </interface>
 	var networkInterfaceDevices []XMLDomainDescriptionDevicesInterface
 	if len(cm.Networks) > 0 {
@@ -650,6 +671,17 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 				Source: &XMLDomainDescriptionDevicesInterfaceSource{
 					//Bridge:  DefaultInterfaceSourceBridge,
 					Network: network.Name,
+				},
+				Address: &XMLDomainDescriptionDevicesInterfaceAddress{
+					Type: DefaultInterfaceAddressType,
+					// WARNING it is very important to sort the interface slots for the pci address
+					// indeed, it allows us to control the name of the interface in the machine, which is
+					// crucial for cloud init to use them in the configuration.
+					// For example, if the slot is 0x02, the interface will be called enp0s2, if the slot
+					// is 0x03, the interface will be called enp0s3, and so on ...
+					// here, slots 0 and 1 are reserved by libvirt.
+					// We have to use slots 2 and above
+					Slot: internal.GetLibvirtInterfaceSlotAddressFromIndex(i + 1),
 				},
 				//Target: XMLDomainDescriptionDevicesInterfaceTarget{}, // provide if user conf specifies a host interface
 				//Target: nil,

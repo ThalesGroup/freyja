@@ -10,6 +10,9 @@ machines:
     image: "/tmp/debian-12-generic-amd64.qcow2" # MANDATORY
     os: "debian12" # MANDATORY
     networks:
-      - name: ctrl-plane
-      - name: data-plane
+      - name: ctrlplane
+      - name: dataplane
+    users:
+      - name: freyja
+        sudo: true
 

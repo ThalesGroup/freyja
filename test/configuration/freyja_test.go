@@ -1,78 +1,25 @@
 package configuration
 
 import (
-	"embed"
 	"freyja/internal/configuration"
-	internal2 "freyja/test"
+	internalTest "freyja/test"
 	"log"
-	"os"
 	"testing"
 )
 
-// testFilesDir
-//
-//go:embed static/*
-var testFilesConfigurationDir embed.FS
+const FreyjaUnitTestConfigDir string = internalTest.FreyjaUnitTestDir + "/freyja-config"
 
-// testFileEmptyConfiguration is used to test empty configuration (missing required values)
+// TestFileEmptyConfiguration is used to test empty configuration (missing required values)
 const testFileEmptyConfiguration string = "static/empty_conf.yaml"
 
-// testFileValidDefaultConfiguration is used to test minimal required values and default values
+// TestFileValidDefaultConfiguration is used to test minimal required values and default values
 const testFileValidDefaultConfiguration string = "static/default_conf.yaml"
 
-// testFileValidDefaultFilesConfiguration is used to test minimal required values and default values
+// TestFileValidDefaultFilesConfiguration is used to test minimal required values and default values
 const testFileValidDefaultFilesConfiguration string = "static/default_conf_files.yaml"
 
 // TestFileValidCompleteConfiguration is used to test all the possible values in a configuration
-const TestFileValidCompleteConfiguration string = "static/complete_conf.yaml"
-
-const SamPubFileName string = "sam.pub"
-
-const ExtPubFileName string = "ext.pub"
-
-const HelloFileName string = "hello.txt"
-
-const WorldFileName string = "world.txt"
-
-// ExpectedSamPubContent inject some content in temp file for unit tests
-const ExpectedSamPubFileContent string = "key"
-
-// ExpectedExtPubContent inject some content in temp file for unit tests
-const ExpectedExtPubFileContent string = "key"
-
-// ExpectedHelloContent inject some content in temp file for unit tests
-const ExpectedHelloFileContent string = "hello"
-
-// ExpectedWorldContent inject some content in temp file for unit tests
-const ExpectedWorldFileContent string = "world"
-
-const FreyjaUnitTestConfigDir string = internal2.FreyjaUnitTestDir + "/config"
-
-func BuildCompleteConfig() *configuration.FreyjaConfiguration {
-	parentDir := "config"
-	// mandatory files for the test
-	internal2.WriteTempTestFile(SamPubFileName, parentDir, []byte(ExpectedSamPubFileContent))
-	internal2.WriteTempTestFile(ExtPubFileName, parentDir, []byte(ExpectedExtPubFileContent))
-	internal2.WriteTempTestFile(HelloFileName, parentDir, []byte(ExpectedHelloFileContent))
-	internal2.WriteTempTestFile(WorldFileName, parentDir, []byte(ExpectedWorldFileContent))
-	// build freyja config
-	var c configuration.FreyjaConfiguration
-	if err := c.BuildFromFile(TestFileValidCompleteConfiguration); err != nil {
-		log.Printf("Cannot build configuration from file '%s': %v", TestFileValidCompleteConfiguration, err)
-		os.Exit(1)
-	}
-	return &c
-}
-
-func BuildDefaultConfig() *configuration.FreyjaConfiguration {
-	// build freyja config
-	var c configuration.FreyjaConfiguration
-	if err := c.BuildFromFile(testFileValidDefaultConfiguration); err != nil {
-		log.Printf("Cannot build configuration from file '%s': %v", testFileValidDefaultConfiguration, err)
-		os.Exit(1)
-	}
-	return &c
-}
+const testFileValidCompleteConfiguration string = "static/complete_conf.yaml"
 
 func compareOrderedStringSlices(slice1 []string, slice2 []string) bool {
 	if len(slice1) != len(slice2) {
@@ -105,7 +52,7 @@ func replaceFirstConfFile(c *configuration.FreyjaConfiguration, f *configuration
 }
 
 func TestValidate(t *testing.T) {
-	c := BuildCompleteConfig()
+	c := internalTest.BuildCompleteConfig(testFileValidCompleteConfiguration)
 	testValidateVersion(t, c)
 	testValidateNetworks(t, c)
 	testValidateMachineNetwork(t, c)
@@ -201,7 +148,7 @@ func testValidateMachineNetwork(t *testing.T, c *configuration.FreyjaConfigurati
 
 func testValidateMachineUser(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationUser := c.Machines[0].Users[0]
-	tempFile := internal2.WriteTempTestFile("test-valid-user-key.pub", "config", []byte("test"))
+	tempFile := internalTest.WriteTempTestFile("test-valid-user-key.pub", "config", []byte("test"))
 	// invalid
 	configurationUser.Keys = append(configurationUser.Keys, "dumb")
 	replaceFirstConfUser(c, &configurationUser)
@@ -233,7 +180,7 @@ func testValidateMachineFiles(t *testing.T, c *configuration.FreyjaConfiguration
 		}
 	}
 	// valid values
-	tempFile := internal2.WriteTempTestFile("test-valid-file-source.txt", "config", []byte("test"))
+	tempFile := internalTest.WriteTempTestFile("test-valid-file-source.txt", "config", []byte("test"))
 	values = []string{tempFile, "/dev/null"}
 	for _, value := range values {
 		configurationFile.Source = value
@@ -325,7 +272,7 @@ func TestBuildDefaultConfiguration(t *testing.T) {
 		t.Logf("expected image '%s' but got '%s'", expectedImage, m.Image)
 		t.Fail()
 	}
-	expectedOs := "centos8"
+	expectedOs := "debian12"
 	if m.Os != expectedOs {
 		t.Logf("expected OS '%s' but got '%s'", expectedOs, m.Os)
 		t.Fail()
@@ -412,7 +359,7 @@ func TestBuildDefaultFilesConfig(t *testing.T) {
 
 // TestBuildCompleteConfig checks all the values that can be set in a configuration
 func TestBuildCompleteConfig(t *testing.T) {
-	c := BuildCompleteConfig()
+	c := internalTest.BuildCompleteConfig(testFileValidCompleteConfiguration)
 	// test config
 	// VERSION, HOSTNAME, OS AND IMAGE VALUES ARE ALREADY TESTED IN THE DEFAULT CONFIG TEST
 	if len(c.Machines) != 2 {
@@ -434,7 +381,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 		t.Logf("expected network mac '52:54:02:aa:bb:cc' but got '%s'", n1.Mac)
 		t.Fail()
 	}
-	if n1.Interface != "vnet0" {
+	if n1.Interface != "virbr0" {
 		t.Logf("expected network interface 'vnet0' but got '%s'", n1.Interface)
 		t.Fail()
 	}
@@ -463,7 +410,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 		t.Fail()
 	}
 	// user ssh keys
-	u1ExpectedKeys := []string{FreyjaUnitTestConfigDir + "/sam.pub", FreyjaUnitTestConfigDir + "/ext.pub"}
+	u1ExpectedKeys := []string{internalTest.FreyjaUnitTestDirCommon + "/sam.pub", internalTest.FreyjaUnitTestDirCommon + "/ext.pub"}
 	if !compareOrderedStringSlices(u1ExpectedKeys, u1.Keys) {
 		t.Logf("expected user keys '%v' but got '%v'", u1ExpectedKeys, u1.Keys)
 		t.Fail()
@@ -510,7 +457,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 		t.Fail()
 	}
 	f1 := m1.Files[0]
-	if f1.Source != FreyjaUnitTestConfigDir+"/hello.txt" {
+	if f1.Source != internalTest.FreyjaUnitTestDirCommon+"/hello.txt" {
 		t.Logf("expected file source '/tmp/freyja-unit-test/config/hello.txt' but got '%s'", f1.Source)
 		t.Fail()
 	}
@@ -527,7 +474,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 		t.Fail()
 	}
 	f2 := m1.Files[1]
-	if f2.Source != FreyjaUnitTestConfigDir+"/world.txt" {
+	if f2.Source != internalTest.FreyjaUnitTestDirCommon+"/world.txt" {
 		t.Logf("expected file source '/tmp/freyja-unit-test/config/world.txt' but got '%s'", f2.Source)
 		t.Fail()
 	}

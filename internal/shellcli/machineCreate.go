@@ -45,7 +45,18 @@ var machineCreateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		Logger.Debug("create machines from configuration file", "config", configurationPath)
 		// TODO :
-		//   - dry-run dont dump xml configuration for networks
+		//   - lorsque 2 réseaux sont configurés, seul le premier est utilisé pour la vm
+		//		cf le troubleshooting chatgpt
+		//   - essayer de configurer 2 réseaux nat sur le même bridge en le configurant explicitement :
+		//			<network>
+		//  			<name>dataplane</name>
+		//  			<bridge name="virbr1"/>
+		//  			<ip address="192.168.124.1" netmask="255.255.255.0">
+		//  			  <dhcp>
+		//  			    <range start="192.168.124.2" end="192.168.124.254"/>
+		//  			  </dhcp>
+		//  			</ip>
+		//			</network>
 		//	 - test different usecases for network and machine creation.
 		//		currently, the network creation does not take dhcp conf into account. Fix it.
 		//		you can check this by dumping the net-info xml from virsh.
@@ -88,9 +99,6 @@ var machineCreateCmd = &cobra.Command{
 				os.Exit(1)
 			}
 
-			// Create networks for machines
-			// Use the same method as the network create command
-
 			// copy root image to the machine dir
 			// !!! NOT SURE IF ROOT IMAGE FILE SHOULD BE COPIED AS WELL
 			// basically, no because overlay is made for single machine usage on top of root image
@@ -131,20 +139,20 @@ var machineCreateCmd = &cobra.Command{
 			}
 
 			// create network configuration
-			//xmlNetworkDescriptions, err := GenerateLibvirtNetworksXMLDescriptions(&freyjaConfiguration)
-			//if err != nil {
-			//	Logger.Error("cannot create the libvirt networks xml descriptions from configuration", "reason", err.Error())
-			//	os.Exit(1)
-			//}
+			xmlNetworkDescriptions, err := GenerateLibvirtNetworksXMLDescriptions(&freyjaConfiguration, FreyjaNetworksWorkspaceDir)
+			if err != nil {
+				Logger.Error("cannot create the libvirt networks xml descriptions from configuration", "reason", err.Error())
+				os.Exit(1)
+			}
 
 			// create the machine in libvirt
 			if !dryRun {
-				// TODO first, create the libvirt networks
+				// first, create the networks for machines, if any
 				Logger.Debug("create machine's networks")
-				// the network is not pushed in libvirt if --dry-run command is used
-				//if err = createNetworkFromConfig(&freyjaConfiguration); err != nil {
-				//	Logger.Error("cannot create the machine's networks", "machine", machine.Hostname, "reason", err.Error())
-				//}
+				if err := CreateNetworksInLibvirt(xmlNetworkDescriptions); err != nil {
+					Logger.Error("cannot create networks in Libvirt from XML descriptions", "reason", err.Error())
+					os.Exit(1)
+				}
 
 				// second, define the libvirt domain (machine not started yet)
 				domain, err := LibvirtConnexion.DomainDefineXML(string(xmlMachineDescription))

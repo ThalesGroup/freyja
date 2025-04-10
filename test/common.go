@@ -3,6 +3,7 @@ package internal
 import (
 	"bufio"
 	"crypto/rand"
+	"freyja/internal/configuration"
 	"log"
 	"os"
 	"path/filepath"
@@ -10,6 +11,28 @@ import (
 )
 
 const FreyjaUnitTestDir = "/tmp/freyja-unit-test"
+
+const FreyjaUnitTestDirCommon = FreyjaUnitTestDir + "/common"
+
+const SamPubFileName string = "sam.pub"
+
+const ExtPubFileName string = "ext.pub"
+
+const HelloFileName string = "hello.txt"
+
+const WorldFileName string = "world.txt"
+
+// ExpectedSamPubFileContent inject some content in temp file for unit tests
+const ExpectedSamPubFileContent string = "key"
+
+// ExpectedExtPubFileContent inject some content in temp file for unit tests
+const ExpectedExtPubFileContent string = "key"
+
+// ExpectedHelloFileContent inject some content in temp file for unit tests
+const ExpectedHelloFileContent string = "hello"
+
+// ExpectedWorldFileContent inject some content in temp file for unit tests
+const ExpectedWorldFileContent string = "world"
 
 func WriteTempTestFile(name string, parentDirName string, content []byte) string {
 	dir := filepath.Join(FreyjaUnitTestDir, parentDirName)
@@ -59,4 +82,30 @@ func WriteRandomBytesTempFile(t *testing.T, name string, parentDirName string) i
 		t.FailNow()
 	}
 	return stats.Size()
+}
+
+func BuildCompleteConfig(relativePath string) *configuration.FreyjaConfiguration {
+	parentDir := "common"
+	// mandatory files for the test
+	WriteTempTestFile(SamPubFileName, parentDir, []byte(ExpectedSamPubFileContent))
+	WriteTempTestFile(ExtPubFileName, parentDir, []byte(ExpectedExtPubFileContent))
+	WriteTempTestFile(HelloFileName, parentDir, []byte(ExpectedHelloFileContent))
+	WriteTempTestFile(WorldFileName, parentDir, []byte(ExpectedWorldFileContent))
+	// build freyja config
+	var c configuration.FreyjaConfiguration
+	if err := c.BuildFromFile(relativePath); err != nil {
+		log.Printf("Cannot build configuration from file '%s': %v", relativePath, err)
+		os.Exit(1)
+	}
+	return &c
+}
+
+func BuildConfig(relativePath string) *configuration.FreyjaConfiguration {
+	// build freyja config
+	var c configuration.FreyjaConfiguration
+	if err := c.BuildFromFile(relativePath); err != nil {
+		log.Printf("Cannot build configuration from file '%s': %v", relativePath, err)
+		os.Exit(1)
+	}
+	return &c
 }

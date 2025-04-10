@@ -2,6 +2,7 @@ package shellcli
 
 import (
 	"errors"
+	"freyja/internal/configuration"
 	"freyja/internal/shellcli"
 	internalTest "freyja/test"
 	"os"
@@ -28,6 +29,7 @@ func TestGenerateLibvirtNetworksXMLDescriptions(t *testing.T) {
 	xmlDescriptions, err := shellcli.GenerateLibvirtNetworksXMLDescriptions(validConfig, TestNetworksDir)
 	if err != nil {
 		t.Errorf("could not create xml descriptions from test config '%s': %v", testValidCompleteNetworkConfiguration, err)
+		t.FailNow()
 	}
 
 	if len(xmlDescriptions) != 2 {
@@ -45,6 +47,23 @@ func TestGenerateLibvirtNetworksXMLDescriptions(t *testing.T) {
 		if err := os.RemoveAll(filepath.Dir(networkDescriptionPath)); err != nil {
 			t.Fatalf("cannot remove test directory '%s'", networkDescriptionPath)
 		}
+	}
+
+	// test that a network that already exists in libvirt should not be created
+	networks := make([]configuration.FreyjaConfigurationNetwork, 1)
+	networkExists := validConfig.Networks[0]
+	networkExists.Name = "default"
+	networks[0] = networkExists
+	validConfig.Networks = networks
+	xmlDescriptions, err = shellcli.GenerateLibvirtNetworksXMLDescriptions(validConfig, TestNetworksDir)
+	if err != nil {
+		t.Errorf("could not create xml descriptions from test config '%s': %v", testValidCompleteNetworkConfiguration, err)
+		t.FailNow()
+	}
+
+	if len(xmlDescriptions) > 0 {
+		t.Errorf("expected no new networks but found one: %v", xmlDescriptions)
+		t.FailNow()
 	}
 
 }

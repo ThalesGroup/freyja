@@ -150,3 +150,28 @@ virsh define mymachine-libvirt-conf.xml
 virsh start mymachine
 virsh list --all
 ```
+
+## Restore default libvirt network
+
+Dump into a file `default.xml` :
+
+```sh
+echo "<network>
+    <name>default</name>
+    <bridge name='virbr0'/>
+    <forward/>
+    <ip address='192.168.122.1' netmask='255.255.255.0'>
+      <dhcp>
+        <range start='192.168.122.2' end='192.168.122.254'/>
+      </dhcp>
+    </ip>
+  </network>" >> /tmp/default.xml
+```
+
+Define it and push in libvirt :
+
+```sh
+virsh net-define /tmp/default.xml
+virsh net-start /tmp/default
+virsh net-autostart /tmp/default 
+```

@@ -28,7 +28,7 @@ const DefaultMachineVcpu uint = 1
 
 const DefaultNetworkName string = "default"
 
-const DefaultInterfaceName string = "virbr0"
+const DefaultNetworkBridgeName string = "virbr0"
 
 // FreyjaConfiguration is the base model for freyja configuration parameters
 // Example :

@@ -825,16 +825,14 @@ func CreateLibvirtNetworkXMLDescription(networkConfiguration FreyjaConfiguration
 
 	xmlNetworkDescription := XMLNetworkDescription{
 		Name: networkConfiguration.Name,
-		Ip:   xmlNetworkDescriptionIp,
+		Forward: &XMLNetworkDescriptionForward{
+			Mode: string(NetworkForwardModeNat),
+		},
+		Ip: xmlNetworkDescriptionIp,
 	}
 
 	//UUID:    internal.GenerateUUID(),
-	//Forward: &XMLNetworkDescriptionForward{
-	//	Mode: string(NetworkForwardModeNat),
-	//},
-	//Bridge: &XMLNetworkDescriptionBridge{
-	//	Name: DefaultInterfaceName,
-	//},
+
 	// set mac address only if provided
 	// otherwise, libvirt will deliver one
 	//if networkConfiguration.Mac != "" {

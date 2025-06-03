@@ -45,15 +45,8 @@ var machineCreateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		Logger.Debug("create machines from configuration file", "config", configurationPath)
 		// TODO :
-		//   - il manque la première clé "network" dans le fichier cloud init network-config:
-		//		#cloud-config
-		//      network:
-		//          version: 2
-		//          ethernets:
-		//              enp0s2:
-		//                  dhcp4: true
-		//              enp0s3:
-		//                  dhcp4: true
+		//	 - when deleting networks, also delete local config directories
+		//   - machine cannot access to internet. check networks configuration
 		//	 - tester avec différente conf réseau que tout fonctionne bien
 		//   - essayer de configurer 2 réseaux nat sur le même bridge en le configurant explicitement :
 		//			<network>

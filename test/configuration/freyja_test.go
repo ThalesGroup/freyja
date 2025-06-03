@@ -506,3 +506,20 @@ func TestBuildCompleteConfig(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestGetNetworkConfigByName(t *testing.T) {
+	c := internalTest.BuildCompleteConfig(testFileValidCompleteConfiguration)
+	name := "dataplane"
+	network, err := configuration.GetNetworkConfigByName(name, c.Networks)
+	if err != nil {
+		t.Fatalf("error getting network config '%s': %v", name, err)
+	}
+	if network == nil {
+		t.Errorf("network config '%s' should not be nil", name)
+		t.FailNow()
+	}
+	if network.Name != name {
+		t.Errorf("expected network name '%s' but got '%s'", name, network.Name)
+		t.FailNow()
+	}
+}

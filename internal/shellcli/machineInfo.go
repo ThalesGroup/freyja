@@ -45,6 +45,7 @@ var machineInfoCmd = &cobra.Command{
 	TraverseChildren: true, // ensure local flags do not spread to sub commands
 
 	Run: func(cmd *cobra.Command, args []string) {
+
 		// get domain by name
 		domain, err := LibvirtConnexion.DomainLookupByName(infoDomainName)
 		if err != nil {

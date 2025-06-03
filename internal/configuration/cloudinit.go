@@ -93,10 +93,6 @@ type CloudInitUserDataOutput struct {
 
 const CloudInitUserDataUserSudoString string = "ALL=(ALL) NOPASSWD:ALL"
 
-func GetCloudInitUserDataUserSudoStringConst() []string {
-	return []string{CloudInitUserDataUserSudoString}
-}
-
 const CloudInitUserDataUserShellString = "/bin/bash"
 
 // CloudInitUserDataUser
@@ -110,7 +106,7 @@ const CloudInitUserDataUserShellString = "/bin/bash"
 // - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILISxfJd/91TY9DH97/Y6t2zejV8p0x7L4Ygjy45iMPp kaio@kaio-host
 type CloudInitUserDataUser struct {
 	Name              string   `yaml:"name"`           // MANDATORY
-	Sudo              []string `yaml:"sudo,omitempty"` // example if sudo : [ 'ALL=(ALL) NOPASSWD:ALL' ]
+	Sudo              string   `yaml:"sudo,omitempty"` // example if sudo : : "ALL=(ALL) NOPASSWD:ALL"
 	LockPasswd        bool     `yaml:"lock_passwd"`    // default: false
 	Shell             string   `yaml:"shell"`          // default: /bin/bash
 	Passwd            string   `yaml:"passwd,flow"`
@@ -152,6 +148,28 @@ type CloudInitUserDataPowerState struct {
 	Condition bool   `yaml:"condition"` // = True
 }
 
+// CloudInitNetworkConfig
+// network:
+//
+//	 version: 2
+//	 ethernets:
+//		enp0s2:
+//		  dhcp4: true
+//		enp0s3:
+//		  dhcp4: true
+type CloudInitNetworkConfig struct {
+	Network CloudInitNetworkNetworkConfig `yaml:"network"` // version of the config spec
+}
+
+type CloudInitNetworkNetworkConfig struct {
+	Version   int                                       `yaml:"version"` // version of the config spec
+	Ethernets map[string]CloudInitNetworkConfigEthernet `yaml:"ethernets"`
+}
+
+type CloudInitNetworkConfigEthernet struct {
+	DHCP4 bool `yaml:"dhcp4"`
+}
+
 // **************
 // IMPLEMENTATION
 // **************
@@ -165,6 +183,11 @@ const CloudInitMetadataFileName = "meta-data"
 
 const CloudInitUserDataFileName = "user-data"
 
+const CloudInitNetworkConfigFileName = "network-config"
+
+// META DATA
+
+// Build generate the configuration from a file
 func (ci *CloudInitMetadata) Build(machine *FreyjaConfigurationMachine) error {
 	ci.InstanceID = machine.Hostname
 	ci.LocalHostname = machine.Hostname
@@ -200,7 +223,7 @@ func (ci *CloudInitUserData) Build(machine *FreyjaConfigurationMachine) error {
 
 		if u.Sudo {
 			// inject sudo list of parameters
-			ciu.Sudo = GetCloudInitUserDataUserSudoStringConst()
+			ciu.Sudo = CloudInitUserDataUserSudoString
 			// inject sudo in groups
 			u.Groups = append(u.Groups, "sudo")
 		}
@@ -310,6 +333,45 @@ func (ci *CloudInitUserData) Write(directory string) (err error) {
 	return writeCloudInitConfig(directory, CloudInitUserDataFileName, data)
 }
 
+// NETWORK CONFIG
+
+// Build the network-config data model from the freyja configuration.
+// Just like meta-data and user-data models, this model must be generated in yaml and included
+// within the cloud-init ISO file for provisioning.
+// This function must take as input the network associated to the machine.
+// If none, no need to configure the networks in cloud-init because libvirt will use the default
+// configuration.
+// Otherwise, this function must take every network configured for this machine and compute the
+// associated interface name to inject it within this configuration.
+// We need to mount every interface within the virtual machine at-boot.
+func (cn *CloudInitNetworkConfig) Build(machine *FreyjaConfigurationMachine) error {
+	ethernets := make(map[string]CloudInitNetworkConfigEthernet, len(machine.Networks))
+	for _, network := range machine.Networks {
+		interfaceName, err := machine.GetCloudInitInterfaceName(network.Name)
+		if err != nil {
+			return fmt.Errorf("could not create cloud init config for network %s: %w", network.Name, err)
+		}
+		ethernets[interfaceName] = CloudInitNetworkConfigEthernet{
+			DHCP4: true,
+		}
+	}
+	networkConfig := CloudInitNetworkNetworkConfig{
+		Version:   2,
+		Ethernets: ethernets,
+	}
+
+	cn.Network = networkConfig
+	return nil
+}
+
+func (cn *CloudInitNetworkConfig) Write(directory string) (err error) {
+	var data []byte
+	if data, err = yaml.Marshal(cn); err != nil {
+		return fmt.Errorf("could not parse cloud init meta data in '%s': %w", directory, err)
+	}
+	return writeCloudInitConfig(directory, CloudInitNetworkConfigFileName, data)
+}
+
 //
 // GENERATE
 //
@@ -345,7 +407,7 @@ func writeCloudInitConfig(directory string, filename string, data []byte) (err e
 }
 
 func GenerateCloudInitConfigs(machine *FreyjaConfigurationMachine, outputDir string) error {
-	// metadata generation
+	// meta-data generation
 	var cm CloudInitMetadata
 	if err := cm.Build(machine); err != nil {
 		msg := fmt.Sprintf("cannot build cloud init metadata for machine '%s'", machine.Hostname)
@@ -355,13 +417,23 @@ func GenerateCloudInitConfigs(machine *FreyjaConfigurationMachine, outputDir str
 		msg := fmt.Sprintf("cannot write cloud init metadata file for machine '%s'", machine.Hostname)
 		return fmt.Errorf(msg, err)
 	}
-	// user data generation
+	// user-data generation
 	var cu CloudInitUserData
 	if err := cu.Build(machine); err != nil {
 		msg := fmt.Sprintf("cannot build cloud init user data for machine '%s'", machine.Hostname)
 		return fmt.Errorf(msg, err)
 	}
 	if err := cu.Write(outputDir); err != nil {
+		msg := fmt.Sprintf("cannot write cloud init user data file for machine '%s'", machine.Hostname)
+		return fmt.Errorf(msg, err)
+	}
+	// network-config generation
+	var cn CloudInitNetworkConfig
+	if err := cn.Build(machine); err != nil {
+		msg := fmt.Sprintf("cannot build cloud init user data for machine '%s'", machine.Hostname)
+		return fmt.Errorf(msg, err)
+	}
+	if err := cn.Write(outputDir); err != nil {
 		msg := fmt.Sprintf("cannot write cloud init user data file for machine '%s'", machine.Hostname)
 		return fmt.Errorf(msg, err)
 	}
@@ -375,7 +447,7 @@ func GenerateCloudInitConfigs(machine *FreyjaConfigurationMachine, outputDir str
 // CreateCloudInitIso creates the ISO file following the iso9660 standard.
 // Implementation using kdomanski/iso9660 : https://github.com/kdomanski/iso9660
 // it is also used in terraform for proxmox : https://github.com/Telmate/terraform-provider-proxmox/blob/186ec3f23bf4a62fcad35f6292fa1350b8e1183b/proxmox/resource_cloud_init_disk.go#L77-L122
-// YOU MUST name the provision files 'user-data' 'meta-data' !!!!!!!!
+// YOU MUST name the provisioning files 'user-data', 'meta-data' and 'network-config' !!!!!!!!
 // YOU MUST name the ISO volume 'cidata' !!!!!!
 func CreateCloudInitIso(machine *FreyjaConfigurationMachine, machineDir string) (string, error) {
 	isoWriter, err := iso9660.NewWriter()
@@ -383,27 +455,40 @@ func CreateCloudInitIso(machine *FreyjaConfigurationMachine, machineDir string) 
 		return "", fmt.Errorf("cannot create the iso9660 writer for the machine '%s' : %w", machine.Hostname, err)
 	}
 	// add cloud init metadata in ISO
+	// YOU MUST name the provisioning file 'meta-data' !!!!!!!!
 	metadataPath := filepath.Join(machineDir, CloudInitMetadataFileName)
 	fm, err := os.Open(metadataPath)
 	if err != nil {
 		return "", fmt.Errorf("cannot open the cloud init metadata file in '%s' : %w", metadataPath, err)
 	}
 	defer fm.Close()
-	// YOU MUST name the provision files 'user-data' 'meta-data' !!!!!!!!
-	if err = isoWriter.AddFile(fm, "meta-data"); err != nil {
+	if err = isoWriter.AddFile(fm, CloudInitMetadataFileName); err != nil {
 		return "", fmt.Errorf("cannot add the cloud init metadata file in ISO for the machine '%s' : %w", machine.Hostname, err)
 	}
 	// add cloud init user data in ISO
+	// YOU MUST name the provisioning file 'user-data' !!!!!!!!
 	userdataPath := filepath.Join(machineDir, CloudInitUserDataFileName)
 	fu, err := os.Open(userdataPath)
 	if err != nil {
 		return "", fmt.Errorf("cannot open the cloud init user data file in '%s' : %w", userdataPath, err)
 	}
 	defer fu.Close()
-	// YOU MUST name the provision files 'user-data' 'meta-data' !!!!!!!!
 	if err = isoWriter.AddFile(fu, "user-data"); err != nil {
 		return "", fmt.Errorf("cannot add the cloud init user data file in ISO for the machine '%s' : %w", machine.Hostname, err)
 	}
+
+	// add cloud init network config in ISO
+	// YOU MUST name the provisioning file 'network-config' !!!!!!!!
+	networkConfigPath := filepath.Join(machineDir, CloudInitNetworkConfigFileName)
+	fn, err := os.Open(networkConfigPath)
+	if err != nil {
+		return "", fmt.Errorf("cannot open the cloud init network config file in '%s' : %w", networkConfigPath, err)
+	}
+	defer fn.Close()
+	if err = isoWriter.AddFile(fn, CloudInitNetworkConfigFileName); err != nil {
+		return "", fmt.Errorf("cannot add the cloud init network config file in ISO for the machine '%s' : %w", machine.Hostname, err)
+	}
+
 	// delete pre-existing ISO file for provision update
 
 	// write iso on filesystem

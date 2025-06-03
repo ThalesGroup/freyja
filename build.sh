@@ -29,6 +29,7 @@ echo "Build freyja"
 cd "${PROJECT_DIR}" || exit
 mkdir -p "${DIST_DIR:?}"
 go build -o "${DIST_DIR:?}/${BIN_NAME}" "${GO_MAIN:?}"
+chmod +x "${DIST_DIR:?}/${BIN_NAME}"
 
 echo "Built in ${DIST_DIR:?}/${BIN_NAME}"
 

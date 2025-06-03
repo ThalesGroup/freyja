@@ -161,10 +161,16 @@ func CalculateSubnetInfo(cidr string) (gateway, netmask, dhcpStart, dhcpEnd stri
 	return gatewayIP.String(), netmaskIp.String(), dhcpStartIP.String(), dhcpEndIP.String(), nil
 }
 
-// GetLibvirtInterfaceSlotAddressFromIndex returns the slot address in format '0x0i', usable in
-// libvirt xml configurations, where i is the index provided in input
-func GetLibvirtInterfaceSlotAddressFromIndex(index int) string {
-	return fmt.Sprintf("0x0%d", index)
+// GetLibvirtInterfaceSlotAddressFromIndex takes an index number 'i' and returns the slot address in
+// format '0x0i', usable in libvirt xml configurations, where i is the index provided in input
+func GetLibvirtInterfaceSlotAddressFromIndex(index uint) string {
+	return fmt.Sprintf("0x%02x", index)
+}
+
+// GetMachineInterfaceNameFromIndex takes an index number 'i' and returns the interface name in
+// format 'enp0si', usable in cloud-init configurations, where i is the index provided in input
+func GetMachineInterfaceNameFromIndex(index uint) string {
+	return fmt.Sprintf("enp0s%d", index)
 }
 
 // GetMachineInterfaceFromSlotAddress  converts libvirt slot addresses like '0x03' or '0x7d' to

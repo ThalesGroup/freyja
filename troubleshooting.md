@@ -392,3 +392,8 @@ cat /var/lib/libvirt/dnsmasq/dataplane.leases
 ---
 
 Si tu veux, je peux aussi te générer une config `netplan` complète adaptée à ta VM. Tu veux du statique ou du DHCP pour l’interface `dataplane` ?
+
+##
+
+[FAILED] Failed to start cloud-init…l cloud-init job (pre-networking).
+

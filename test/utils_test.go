@@ -208,3 +208,66 @@ func TestNetworkParsing(t *testing.T) {
 		}
 	}
 }
+
+func TestGetLibvirtInterfaceSlotAddressFromIndex(t *testing.T) {
+	var input1 uint
+	input1 = 3
+	expected1 := "0x03"
+	output := internal.GetLibvirtInterfaceSlotAddressFromIndex(input1)
+	if output != expected1 {
+		t.Errorf("expected '%s' but got '%s'", expected1, output)
+		t.Fail()
+	}
+
+	var input2 uint
+	input2 = 125
+	expected2 := "0x7d"
+	output = internal.GetLibvirtInterfaceSlotAddressFromIndex(input2)
+	if output != expected2 {
+		t.Errorf("expected '%s' but got '%s'", expected2, output)
+		t.Fail()
+	}
+
+}
+
+func TestGetMachineInterfaceFromSlotAddress(t *testing.T) {
+	input := "0x03"
+	expected := "enp0s3"
+	output, err := internal.GetMachineInterfaceFromSlotAddress(input)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if output != expected {
+		t.Errorf("expected '%s' but got '%s'", expected, output)
+		t.Fail()
+	}
+
+	input = "0x7d"
+	expected = "enp0s125"
+	output, err = internal.GetMachineInterfaceFromSlotAddress(input)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if output != expected {
+		t.Errorf("expected '%s' but got '%s'", expected, output)
+		t.Fail()
+	}
+}
+
+func TestGetMachineInterfaceNameFromIndex(t *testing.T) {
+	input := 3
+	expected := "enp0s3"
+	output := internal.GetMachineInterfaceNameFromIndex(uint(input))
+	if output != expected {
+		t.Errorf("expected '%s' but got '%s'", expected, output)
+		t.Fail()
+	}
+
+	input = 125
+	expected = "enp0s125"
+	output = internal.GetMachineInterfaceNameFromIndex(uint(input))
+	if output != expected {
+		t.Errorf("expected '%s' but got '%s'", expected, output)
+		t.Fail()
+	}
+}

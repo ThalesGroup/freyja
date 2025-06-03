@@ -134,6 +134,10 @@ type Configuration interface {
 	BuildFromFile(path string) error
 }
 
+// ************
+// CONFIG AUDIT
+// ************
+
 // Validate audits the whole freyja configuration for content mistakes
 // mistake = configuration value that may cause further issues during machine creation in libvirt
 func (c *FreyjaConfiguration) Validate() (err error) {
@@ -193,6 +197,7 @@ func (c *FreyjaConfiguration) validateVersion() error {
 	return nil
 }
 
+// validateNetworks validate the network configurations in section 'networks' at the config's root
 func (c *FreyjaConfiguration) validateNetworks() error {
 	for _, network := range c.Networks {
 		if network.Name == "" {
@@ -213,7 +218,7 @@ func (c *FreyjaConfiguration) validateNetworks() error {
 	return nil
 }
 
-// ValidateNetwork audits the network configuration including
+// validateMachineNetwork audits the network configuration including
 //   - the name of the network
 //   - the format of the mac address
 func (cn *FreyjaConfigurationMachineNetwork) validateMachineNetwork() error {
@@ -249,6 +254,7 @@ func (cu *FreyjaConfigurationUser) validateUser() error {
 	return nil
 }
 
+// validateFiles validate the machine's configuration for file injection in the filesystem
 func (cf *FreyjaConfigurationFile) validateFiles() error {
 	// validate source
 	if !internal.FileExists(cf.Source) {
@@ -278,6 +284,10 @@ func (cf *FreyjaConfigurationFile) validateFiles() error {
 	}
 	return nil
 }
+
+// **************
+// BUILDER CONFIG
+// **************
 
 // BuildFromFile generate the configuration from a file
 func (c *FreyjaConfiguration) BuildFromFile(path string) error {
@@ -309,6 +319,10 @@ func (c *FreyjaConfiguration) BuildFromFile(path string) error {
 	}
 	return nil
 }
+
+// **********************
+// DEFAULT VALUES SETTERS
+// **********************
 
 // setDefaultValues set values to parameters that have not been configured but are still required
 // for libvirt
@@ -377,6 +391,7 @@ func (c *FreyjaConfiguration) setDefaultValues() {
 	}
 }
 
+// setUsers set default user if needed
 func (c *FreyjaConfiguration) setUsers() {
 	//machines := make([]FreyjaConfigurationMachine, len(c.Machines))
 	for i, machine := range c.Machines {
@@ -388,4 +403,44 @@ func (c *FreyjaConfiguration) setUsers() {
 		machine.Users = users
 		c.Machines[i] = machine
 	}
+}
+
+// *****
+// UTILS
+// *****
+
+// GetLibvirtNetworkAddressSlot will search into the machine networks and will return the slot
+// address in libvirt format such as '0x02'.
+// The two last digits of the address are calculated as follows : hexa(rank in machine networks' list + 2)
+func (m *FreyjaConfigurationMachine) GetLibvirtNetworkAddressSlot(networkName string) (slot string, err error) {
+	for i, network := range m.Networks {
+		if network.Name == networkName {
+			return fmt.Sprintf("0x%02x", i+2), nil
+		}
+	}
+	return "", fmt.Errorf("cannot find '%s' in machine networks", networkName)
+}
+
+// GetCloudInitInterfaceName will search into the machine networks and will return the interface
+// name for cloud init provisioning. This is also the name that the interface will have within the
+// machine once it is started, such as 'enp0s2'.
+// The two last digit of the address is equal to the rank in machine networks' list + 2
+func (m *FreyjaConfigurationMachine) GetCloudInitInterfaceName(networkName string) (slot string, err error) {
+	for i, network := range m.Networks {
+		if network.Name == networkName {
+			return fmt.Sprintf("enp0s%d", i+2), nil
+		}
+	}
+	return "", fmt.Errorf("cannot find '%s' in machine networks", networkName)
+}
+
+// GetNetworkConfigByName look for the network configuration at freyja config file's root with a
+// given name
+func GetNetworkConfigByName(name string, networks []FreyjaConfigurationNetwork) (config *FreyjaConfigurationNetwork, err error) {
+	for _, network := range networks {
+		if network.Name == name {
+			return &network, nil
+		}
+	}
+	return nil, errors.New(fmt.Sprintf("network config '%s' not found", name))
 }

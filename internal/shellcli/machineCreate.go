@@ -45,8 +45,16 @@ var machineCreateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		Logger.Debug("create machines from configuration file", "config", configurationPath)
 		// TODO :
-		//   - lorsque 2 réseaux sont configurés, seul le premier est utilisé pour la vm
-		//		cf le troubleshooting chatgpt
+		//   - il manque la première clé "network" dans le fichier cloud init network-config:
+		//		#cloud-config
+		//      network:
+		//          version: 2
+		//          ethernets:
+		//              enp0s2:
+		//                  dhcp4: true
+		//              enp0s3:
+		//                  dhcp4: true
+		//	 - tester avec différente conf réseau que tout fonctionne bien
 		//   - essayer de configurer 2 réseaux nat sur le même bridge en le configurant explicitement :
 		//			<network>
 		//  			<name>dataplane</name>
@@ -157,7 +165,7 @@ var machineCreateCmd = &cobra.Command{
 				// second, define the libvirt domain (machine not started yet)
 				domain, err := LibvirtConnexion.DomainDefineXML(string(xmlMachineDescription))
 				if err != nil {
-					Logger.Error("cannot define the machine from libvirt domain XML description", "machine", machine.Hostname, "reason", err.Error())
+					Logger.Error("cannot define the machine in libvirt from domain XML description", "machine", machine.Hostname, "reason", err.Error())
 					os.Exit(1)
 				}
 				// finally, create the domain (machine startup)

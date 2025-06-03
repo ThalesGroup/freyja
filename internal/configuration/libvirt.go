@@ -42,6 +42,12 @@ type DeviceInterfaceType string
 
 type DeviceInterfaceAddressType string
 
+type DeviceInterfaceAddressDomain string
+
+type DeviceInterfaceAddressBus string
+
+type DeviceInterfaceAddressFunction string
+
 type DeviceSerialType string
 
 type DeviceSerialTargetType string
@@ -112,6 +118,18 @@ const (
 
 const (
 	PciDeviceInterfaceAddressType DeviceInterfaceAddressType = "pci"
+)
+
+const (
+	DefaultDeviceInterfaceAddressDomain DeviceInterfaceAddressDomain = "0x0000"
+)
+
+const (
+	DefaultDeviceInterfaceAddressBus DeviceInterfaceAddressBus = "0x00"
+)
+
+const (
+	DefaultDeviceInterfaceAddressFunction DeviceInterfaceAddressFunction = "0x0"
 )
 
 const (
@@ -405,7 +423,7 @@ type XMLDomainDescriptionDevicesInterfaceMac struct {
 
 type XMLDomainDescriptionDevicesInterfaceSource struct {
 	XMLName xml.Name `xml:"source"`
-	Bridge  string   `xml:"bridge,attr"`
+	Bridge  string   `xml:"bridge,attr,omitempty"`
 	Network string   `xml:"network,attr"`
 }
 
@@ -419,10 +437,15 @@ type XMLDomainDescriptionDevicesInterfaceModel struct {
 	Type    string   `xml:"type,attr"`
 }
 
+// XMLDomainDescriptionDevicesInterfaceAddress
+// <address type='pci' domain='0x0000' bus='0x01' slot='0x01' function='0x0'/>
 type XMLDomainDescriptionDevicesInterfaceAddress struct {
-	XMLName xml.Name `xml:"address"`
-	Type    string   `xml:"type,attr"`
-	Slot    string   `xml:"slot,attr"`
+	XMLName  xml.Name `xml:"address"`
+	Type     string   `xml:"type,attr"`
+	Domain   string   `xml:"domain,attr"`
+	Bus      string   `xml:"bus,attr"`
+	Slot     string   `xml:"slot,attr"`
+	Function string   `xml:"function,attr"`
 }
 
 // XMLDomainDescriptionDevicesConsole
@@ -659,13 +682,17 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 	//        <interface type="network">
 	//            <mac address="52:54:00:17:49:b7"/>
 	//            <source network="default"/>
-	//            <address type="pci" slot="0x02"/>
+	//            //<address type='pci' domain='0x0000' bus='0x01' slot='0x01' function='0x0'/>
 	//        </interface>
 	var networkInterfaceDevices []XMLDomainDescriptionDevicesInterface
 	if len(cm.Networks) > 0 {
 		// user defined networks
 		networkInterfaceDevices = make([]XMLDomainDescriptionDevicesInterface, len(cm.Networks))
 		for i, network := range cm.Networks {
+			networkSlot, err := cm.GetLibvirtNetworkAddressSlot(network.Name)
+			if err != nil {
+				return nil, fmt.Errorf("cannot get libvirt network slot for network '%s': %w", network.Name, err)
+			}
 			networkInterfaceDevice := XMLDomainDescriptionDevicesInterface{
 				Type: string(NetworkDeviceInterfaceType),
 				Source: &XMLDomainDescriptionDevicesInterfaceSource{
@@ -674,14 +701,44 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 				},
 				Address: &XMLDomainDescriptionDevicesInterfaceAddress{
 					Type: DefaultInterfaceAddressType,
-					// WARNING it is very important to sort the interface slots for the pci address
+					// WARNING 1
+					// it is very important to sort the interface slots for the pci address
 					// indeed, it allows us to control the name of the interface in the machine, which is
 					// crucial for cloud init to use them in the configuration.
 					// For example, if the slot is 0x02, the interface will be called enp0s2, if the slot
 					// is 0x03, the interface will be called enp0s3, and so on ...
 					// here, slots 0 and 1 are reserved by libvirt.
 					// We have to use slots 2 and above
-					Slot: internal.GetLibvirtInterfaceSlotAddressFromIndex(i + 1),
+					// WARNING 2
+					// Qemu addresses are expressed in format '0000:01:00.0' which correspond to :
+					// <address type='pci' domain='0x0000' bus='0x01' slot='0x00' function='0x0'/>
+					// with the same order
+					// WARNING 3
+					// Some addresses must not be used to avoid conflict with hardcoded ones in Qemu
+					// For the x86_64 architecture's I440FX-based machine types the following devices are hard coded into QEMU and can't be moved or eliminated:
+					//0000:00:00.0	Host bridge
+					//0000:00:01.0	ISA bridge
+					//0000:00:01.1	primary IDE controller
+					//0000:00:01.2	PIIX3 USB controller
+					//0000:00:01.3	ACPI (power management) and SMBus controller
+					//0000:00:02.0  primary video card
+					// For the x86_64 architecture's Q35-based machine types the following devices are hard coded into QEMU and can't be moved or eliminated:
+					//0000:00:00.0	Host bridge
+					//0000:00:1f.2	primary SATA controller
+					//0000:00:1f.0	ISA bridge
+					//0000:00:1f.3	SMBus
+					//0000:00:1a.0	USB2 controller 1
+					//0000:00:1b.0	ICH9 sound chip
+					//0000:00:1d.0	USB2 controller 2
+					// WARNING 4
+					// to avoid any collision with addresses, we will use addresses starting from
+					// 0000:01:01.0 for machine interfaces, resulting in the configuration :
+					// <address type='pci' domain='0x0000' bus='0x01' slot='0x01' function='0x0'/>
+					// and we will only increase the slot number per interface
+					Domain:   string(DefaultDeviceInterfaceAddressDomain),
+					Bus:      string(DefaultDeviceInterfaceAddressBus),
+					Slot:     networkSlot,
+					Function: string(DefaultDeviceInterfaceAddressFunction),
 				},
 				//Target: XMLDomainDescriptionDevicesInterfaceTarget{}, // provide if user conf specifies a host interface
 				//Target: nil,
@@ -789,6 +846,7 @@ func CreateLibvirtNetworkXMLDescription(networkConfiguration FreyjaConfiguration
 	return xml.Marshal(xmlNetworkDescription)
 }
 
+// DumpNetworkConfig writes the xml network description for libvirt on disk
 func DumpNetworkConfig(xmlNetworkDescription []byte, path string) (err error) {
 	// re-create the file to inject data
 	file, err := os.Create(path)

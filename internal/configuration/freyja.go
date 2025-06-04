@@ -87,7 +87,6 @@ type FreyjaConfiguration struct {
 type FreyjaConfigurationMachine struct {
 	// MANDATORY
 	Image    string `yaml:"image"`    // Qcow2 image file path on host
-	Os       string `yaml:"os"`       // os type in libosinfo
 	Hostname string `yaml:"hostname"` // domain name in libvirt
 	// optional
 	Networks []FreyjaConfigurationMachineNetwork `yaml:"networks,omitempty"`
@@ -154,6 +153,12 @@ func (c *FreyjaConfiguration) Validate() (err error) {
 		return errors.New("configure at least one machine but found 0")
 	}
 	for _, machine := range c.Machines {
+		if machine.Hostname == "" {
+			return errors.New("missing mandatory machine hostname")
+		}
+		if machine.Image == "" {
+			return errors.New("missing mandatory machine image")
+		}
 		if len(machine.Networks) != 0 {
 			// verify networks
 			for _, network := range machine.Networks {
@@ -162,19 +167,19 @@ func (c *FreyjaConfiguration) Validate() (err error) {
 					return &internal.ConfigurationError{Message: err.Error()}
 				}
 			}
-			// verify users
-			for _, user := range machine.Users {
-				err = user.validateUser()
-				if err != nil {
-					return &internal.ConfigurationError{Message: err.Error()}
-				}
+		}
+		// verify users
+		for _, user := range machine.Users {
+			err = user.validateUser()
+			if err != nil {
+				return &internal.ConfigurationError{Message: err.Error()}
 			}
-			// verify files
-			for _, file := range machine.Files {
-				err = file.validateFiles()
-				if err != nil {
-					return &internal.ConfigurationError{Message: err.Error()}
-				}
+		}
+		// verify files
+		for _, file := range machine.Files {
+			err = file.validateFiles()
+			if err != nil {
+				return &internal.ConfigurationError{Message: err.Error()}
 			}
 		}
 	}

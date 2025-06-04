@@ -272,11 +272,6 @@ func TestBuildDefaultConfiguration(t *testing.T) {
 		t.Logf("expected image '%s' but got '%s'", expectedImage, m.Image)
 		t.Fail()
 	}
-	expectedOs := "debian12"
-	if m.Os != expectedOs {
-		t.Logf("expected OS '%s' but got '%s'", expectedOs, m.Os)
-		t.Fail()
-	}
 	expectedHostname := "vm1"
 	if m.Hostname != expectedHostname {
 		t.Logf("expected OS '%s' but got '%s'", expectedHostname, m.Hostname)

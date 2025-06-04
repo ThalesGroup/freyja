@@ -121,24 +121,32 @@ func getDomainMacIP(domain libvirt.Domain, targetHostInterface string) (mac stri
 	return
 }
 
-func getDomainShortDescription(domain libvirt.Domain, description *configuration.XMLDomainDescription) (*machineDescription, error) {
+func getDomainShortDescription(domain libvirt.Domain, description *configuration.XMLDomainDescription) (short *machineDescription, err error) {
 	// get networks info from xml struct
 	var interfaces []machineInterface
-	for _, ifaceData := range description.Devices.Interfaces {
-		hostInterface := ifaceData.Target.Device
-		mac, ip, err := getDomainMacIP(domain, hostInterface)
-		if err != nil {
-			Logger.Error("Cannot get domain network information", "domain", domain.Name)
-			return nil, err
+	for _, descriptionIface := range description.Devices.Interfaces {
+		var hostInterface, ip string
+		// if machine is up, we can retrieve the IPs and host interface from libvirt
+		if descriptionIface.Target != nil {
+			hostInterface = descriptionIface.Target.Device
+			_, ip, err = getDomainMacIP(domain, hostInterface)
+			if err != nil {
+				Logger.Error("Cannot get domain network information", "domain", domain.Name)
+				return nil, err
+			}
+		} else {
+			hostInterface = "not up: machine down"
+			ip = "not up: machine down"
 		}
-		iface := &machineInterface{
+		machineIface := &machineInterface{
 			HostInterface: hostInterface,
-			Network:       ifaceData.Source.Network,
-			Mac:           mac,
+			Network:       descriptionIface.Source.Network,
+			Mac:           descriptionIface.Mac.Address,
 			IP:            ip,
 		}
-		interfaces = append(interfaces, *iface)
+		interfaces = append(interfaces, *machineIface)
 	}
+
 	// get disks info from xml struct
 	var disks []machineDisk
 	for _, diskData := range description.Devices.Disks {

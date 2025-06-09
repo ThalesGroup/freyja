@@ -49,7 +49,7 @@ func init() {
 // deleteNetworksByConf gets the configuration file in input and delete all the network set inside
 // using Libvirt
 func deleteNetworksByConf() (err error) {
-	// build config from path
+	// build config from a path
 	var freyjaConfiguration configuration.FreyjaConfiguration
 	if err = freyjaConfiguration.BuildFromFile(configurationPath); err != nil {
 		return fmt.Errorf("cannot parse configuration file '%s': %w", configurationPath, err)
@@ -85,6 +85,12 @@ func deleteNetworksByName(names []string) (err error) {
 			// undefine
 			if err := LibvirtConnexion.NetworkUndefine(network); err != nil {
 				return fmt.Errorf("cannot undefine network '%s': %w", name, err)
+			}
+
+			// delete config dirs
+			networkDirPath := GetLibvirtNetworkDir(name)
+			if err = os.RemoveAll(networkDirPath); err != nil {
+				return fmt.Errorf("cannot remove network directory '%s': %w", networkDirPath, err)
 			}
 
 			Logger.Info("Network deleted", "network", name)

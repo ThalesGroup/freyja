@@ -59,8 +59,12 @@ func init() {
 	networkCreateCmd.Flags().BoolVarP(&dryRun, "dry-run", "", false, "Generate all config files without creating the machine")
 }
 
+func GetLibvirtNetworkDir(networkName string) (path string) {
+	return filepath.Join(FreyjaNetworksWorkspaceDir, networkName)
+}
+
 func GetLibvirtNetworkDescriptionPath(networkName string) (path string) {
-	networkDir := filepath.Join(FreyjaNetworksWorkspaceDir, networkName)
+	networkDir := GetLibvirtNetworkDir(networkName)
 	filename := fmt.Sprintf("%s%s%s", XMLNetworkDescriptionPrefix, networkName, XMLNetworkDescriptionSuffix)
 	return filepath.Join(networkDir, filename)
 }
@@ -72,8 +76,8 @@ func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfigur
 	// create networks
 	xmlDescriptions = make(map[string][]byte, len(config.Networks))
 	for _, network := range config.Networks {
-		// check first if network already exists in libvirt
-		// it prevents to update and overwrite an existing network config that is already used by
+		// check first if a network already exists in libvirt
+		// it prevents updating and overwrite an existing network config that is already used by
 		// running machines
 		foundNet, err := LibvirtConnexion.NetworkLookupByName(network.Name)
 		if err != nil {
@@ -92,7 +96,7 @@ func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfigur
 				}
 
 				// create libvirt network configuration
-				// also store the network configs dump path in a map to create them later
+				// also store the network configs dump a path in a map to create them later
 				// it is useful in case of a --dry-run generation
 				Logger.Debug("create network XML description for libvirt", "network", network.Name)
 				var xmlDescription []byte
@@ -127,7 +131,7 @@ func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfigur
 	return xmlDescriptions, nil
 }
 
-// CreateNetworksInLibvirt get the Libvirt's xml description (configuration) of a network and
+// CreateNetworksInLibvirt get the Libvirt's XML description (configuration) of a network and
 // define it then create it in libvirt.
 func CreateNetworksInLibvirt(xmlDescriptions map[string][]byte) error {
 

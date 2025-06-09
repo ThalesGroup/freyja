@@ -45,25 +45,8 @@ var machineCreateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		Logger.Debug("create machines from configuration file", "config", configurationPath)
 		// TODO :
-		//	 - when deleting networks, also delete local config directories
-		//   - machine cannot access to internet. check networks configuration
-		//	 - tester avec différente conf réseau que tout fonctionne bien
-		//   - essayer de configurer 2 réseaux nat sur le même bridge en le configurant explicitement :
-		//			<network>
-		//  			<name>dataplane</name>
-		//  			<bridge name="virbr1"/>
-		//  			<ip address="192.168.124.1" netmask="255.255.255.0">
-		//  			  <dhcp>
-		//  			    <range start="192.168.124.2" end="192.168.124.254"/>
-		//  			  </dhcp>
-		//  			</ip>
-		//			</network>
-		//	 - test different usecases for network and machine creation.
-		//		currently, the network creation does not take dhcp conf into account. Fix it.
-		//		you can check this by dumping the net-info xml from virsh.
-		//   - check that the dry-run option also affect network creation
 		//   - test with multiple ssh keys
-		//   - create the network if it does not already exists
+		//	 - implements features included in python version
 		// build config from path
 		var freyjaConfiguration configuration.FreyjaConfiguration
 		if err := freyjaConfiguration.BuildFromFile(configurationPath); err != nil {
@@ -72,6 +55,7 @@ var machineCreateCmd = &cobra.Command{
 		}
 		// build cloud init config file
 		//var cloudInitData internal.CloudInitUserData
+		var createdMachines []string
 		for _, machine := range freyjaConfiguration.Machines {
 			Logger.Info("create", "machine", machine.Hostname)
 
@@ -167,10 +151,13 @@ var machineCreateCmd = &cobra.Command{
 					Logger.Error("cannot start the machine", "machine", machine.Hostname, "reason", err.Error())
 					os.Exit(1)
 				}
+				createdMachines = append(createdMachines, machine.Hostname)
 			} else {
 				Logger.Warn("skipped startup", "machine", machine.Hostname, "reason", "option --dry-run")
 			}
 		}
+
+		Logger.Info("created", "machines", createdMachines)
 
 	},
 }

@@ -44,6 +44,8 @@ var networkCreateCmd = &cobra.Command{
 				Logger.Error("cannot create networks in Libvirt from XML descriptions", "reason", err.Error())
 				os.Exit(1)
 			}
+		} else {
+			Logger.Warn("skipped networks creation in libvirt", "reason", "option --dry-run")
 		}
 
 	},

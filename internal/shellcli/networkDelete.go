@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"freyja/internal"
 	"freyja/internal/configuration"
+	"github.com/digitalocean/go-libvirt"
 	"github.com/spf13/cobra"
 	"os"
 )
@@ -66,37 +67,49 @@ func deleteNetworksByConf() (err error) {
 	return deleteNetworksByName(networksToDelete)
 }
 
+// #network create -c test/configuration/static/network_complete_conf.yaml --dry-run
 // deleteNetworksByName takes a list of network names and delete them in Libvirt
 func deleteNetworksByName(names []string) (err error) {
 	Logger.Info("delete networks", "names", names)
 
+	var deletedNetworks []string
 	if internal.AskUserYesNoConfirmation() {
 		for _, name := range names {
-			network, err := LibvirtConnexion.NetworkLookupByName(name)
-			if err != nil {
-				return fmt.Errorf("cannot find network '%s': %w", name, err)
-			}
-
-			// destroy
-			if err := LibvirtConnexion.NetworkDestroy(network); err != nil {
-				return fmt.Errorf("cannot destroy network '%s': %w", name, err)
-			}
-
-			// undefine
-			if err := LibvirtConnexion.NetworkUndefine(network); err != nil {
-				return fmt.Errorf("cannot undefine network '%s': %w", name, err)
+			network, errD := LibvirtConnexion.NetworkLookupByName(name)
+			if errD != nil {
+				Logger.Warn("skipped network deletion in libvirt", "network", name, "reason", errD.Error())
+			} else if errD = deleteNetworkInLibvirt(network); errD != nil {
+				// delete in libvirt
+				Logger.Error("cannot delete network in libvirt", "network", name, "reason", errD.Error())
 			}
 
 			// delete config dirs
 			networkDirPath := GetLibvirtNetworkDir(name)
-			if err = os.RemoveAll(networkDirPath); err != nil {
-				return fmt.Errorf("cannot remove network directory '%s': %w", networkDirPath, err)
+			errRemoveDir := os.RemoveAll(networkDirPath)
+			if errRemoveDir != nil {
+				Logger.Error("cannot remove network directory", "path", networkDirPath, "reason", errRemoveDir.Error())
+			} else {
+				Logger.Info("removed network directory", "path", networkDirPath)
 			}
 
-			Logger.Info("Network deleted", "network", name)
 		}
 	} else {
 		Logger.Info("Canceled")
+		return nil
+	}
+
+	Logger.Info("Networks deleted", "networks", deletedNetworks)
+	return err
+}
+
+// deleteNetworkInLibvirt execute 'destroy' and 'undefine' operations in libvirt for a network
+func deleteNetworkInLibvirt(network libvirt.Network) (err error) {
+	// destroy
+	if err = LibvirtConnexion.NetworkDestroy(network); err != nil {
+		return fmt.Errorf("cannot destroy network '%s' in libvirt: %v", network.Name, err.Error())
+	} else if err = LibvirtConnexion.NetworkUndefine(network); err != nil {
+		// undefine
+		return fmt.Errorf("cannot undefine network '%s' in libvirt: %v", network.Name, err.Error())
 	}
 	return nil
 }

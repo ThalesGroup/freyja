@@ -18,7 +18,7 @@ type NetworkDescription struct {
 	Gateway  string           `yaml:"gateway"`
 	Netmask  string           `yaml:"netmask"`
 	Dhcp     DHCPDescription  `yaml:"dhcp"`
-	Machines []NetworkMachine `yaml:"machines,omitempty"`
+	Machines []NetworkMachine `yaml:"machines"`
 }
 
 type DHCPDescription struct {
@@ -41,12 +41,13 @@ var networkInfoCmd = &cobra.Command{
 	TraverseChildren: true, // ensure local flags do not spread to sub commands
 
 	Run: func(cmd *cobra.Command, args []string) {
-		// generate short yaml description
+		// generate short YAML description
 		info, err := getNetworkDescription(infoNetworkName)
 		if err != nil {
 			Logger.Error("cannot get network info", "network", infoNetworkName, "reason", err.Error())
 			os.Exit(1)
 		}
+
 		output, err := yaml.Marshal(info)
 		if err != nil {
 			Logger.Error("cannot parse network info", "network", infoNetworkName, "reason", err.Error())

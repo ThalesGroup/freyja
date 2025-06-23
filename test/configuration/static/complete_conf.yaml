@@ -1,46 +1,43 @@
 ---
 version: v0.1.0-beta
-networks:
-  - name: ctrlplane
-    cidr: 192.168.123.0/24
+networks: # optional
+  - name: ctrlplane # MANDATORY for networks
+    cidr: 192.168.123.0/24 # MANDATORY for networks
   - name: dataplane
     cidr: 192.168.124.0/24
-machines:
+machines: # MANDATORY, at least one
   - image: "/tmp/CentOS-Stream-GenericCloud-8-20210603.0.x86_64.qcow2" # MANDATORY
-    os: "centos8" # MANDATORY
     hostname: "vm1" # MANDATORY, MUST NOT contain underscores
-    networks: # MANDATORY, at least one
-      - name: "ctrl-plane"
-        mac: "52:54:02:aa:bb:cc"
-        interface: "virbr0"
+    networks: # optional
+      - name: "ctrl-plane" # optional, 'default' by default
+        mac: "52:54:02:aa:bb:cc" # optional, dynamic in libvirt
       - name: "data-plane"
         mac: "52:54:02:aa:bb:cd"
-    users: # MANDATORY
-      - name: "sam" # MANDATORY
-        password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # MANDATORY, here 'master'
-        sudo: true
-        keys: # Optional, default '$HOME/.ssh/id_rsa.pub'
+    users: # optional
+      - name: "sam" # optional, 'freyja' by default
+        password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # optional, default 'master'
+        sudo: true # optional, 'false' by default
+        keys: # Optional, default '$HOME/.ssh/vm1.pub'
           - "/tmp/freyja-unit-test/common/sam.pub"
           - "/tmp/freyja-unit-test/common/ext.pub"
-        groups: ["group1", "group2"]
-      - name: "frodo" # MANDATORY
+        groups: ["group1", "group2"] # optional, empty by default
+      - name: "frodo"
         password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # MANDATORY, here 'master'
     storage: 100 # Optional, default '30'
     memory: 8192 # Optional, default '4096'
     vcpu: 4 # Optional, default '2'
-    packages: [ "curl", "net-tools" ]
-    cmd:
+    packages: [ "curl", "net-tools" ] # optional, empty by default
+    cmd: # optional, empty by default
       - "echo 'hello world !' > /tmp/test.txt"
       - "cat /tmp/test.txt"
-    files:
-      - source: "/tmp/freyja-unit-test/common/hello.txt"
-        destination: "/root/hello.txt"
-        permissions : "0700"
-        owner: "root:freyja"
+    files: # optional, empty by default
+      - source: "/tmp/freyja-unit-test/common/hello.txt" # MANDATORY for files
+        destination: "/root/hello.txt" # MANDATORY for files
+        permissions : "0700" # optional, '0600' by default
+        owner: "root:freyja" # optional, 'root:root' by default
       - source: "/tmp/freyja-unit-test/common/world.txt"
         destination: "/home/sam/world.txt"
-    update: true
-    reboot: true
+    update: true # optional, false by default
+    reboot: true # optional, false by default
   - image: "/tmp/ubuntu-20.04-LTS-20210603.0.x86_64.qcow2" # MANDATORY
-    os: "ubuntu20" # MANDATORY
     hostname: "vm2" # MANDATORY, MUST NOT contain underscores

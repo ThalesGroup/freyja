@@ -88,8 +88,8 @@ func TestBuildUserDataCloudInitDefaultConfig(t *testing.T) {
 		t.Errorf("Expected user name '%s' but got '%s'", configuration.DefaultUserName, u.Name)
 		t.Fail()
 	}
-	if u.Sudo != nil {
-		t.Errorf("Expected nil user sudo value but got '%s'", u.Sudo)
+	if u.Sudo != "" {
+		t.Errorf("Expected empty user sudo value but got '%s'", u.Sudo)
 		t.Fail()
 	}
 	if u.LockPasswd {
@@ -165,7 +165,7 @@ func TestBuildUserDataCloudInitCompleteConfig(t *testing.T) {
 		t.Errorf("Expected user name '%s' but got '%s'", expectedU1Name, u1.Name)
 		t.Fail()
 	}
-	if !compareOrderedStringSlices(u1.Sudo, configuration.GetCloudInitUserDataUserSudoStringConst()) {
+	if u1.Sudo != configuration.CloudInitUserDataUserSudoString {
 		t.Errorf("Expected user sudo value '%s' but got '%s'", configuration.CloudInitUserDataUserSudoString, u1.Sudo)
 		t.Fail()
 	}

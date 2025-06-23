@@ -60,6 +60,7 @@ func TestValidate(t *testing.T) {
 	testValidateMachineFiles(t, c)
 }
 
+// testValidateVersion calls the Validate() function with modified 'version' values
 func testValidateVersion(t *testing.T, c *configuration.FreyjaConfiguration) {
 	// invalid
 	values := []string{"1", "beta", ""}
@@ -81,6 +82,7 @@ func testValidateVersion(t *testing.T, c *configuration.FreyjaConfiguration) {
 	}
 }
 
+// testValidateNetworks calls Validate() with modified network configurations
 func testValidateNetworks(t *testing.T, c *configuration.FreyjaConfiguration) {
 	for i, network := range c.Networks {
 		network.Name = ""
@@ -106,6 +108,7 @@ func testValidateNetworks(t *testing.T, c *configuration.FreyjaConfiguration) {
 	}
 }
 
+// testValidateMachineNetwork calls Validate() with modified machine's network configurations
 func testValidateMachineNetwork(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationNetwork := c.Machines[0].Networks[0]
 	// invalid name value
@@ -146,6 +149,7 @@ func testValidateMachineNetwork(t *testing.T, c *configuration.FreyjaConfigurati
 
 }
 
+// testValidateMachineNetwork calls Validate() with modified machine's user configurations
 func testValidateMachineUser(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationUser := c.Machines[0].Users[0]
 	tempFile := internalTest.WriteTempTestFile("test-valid-user-key.pub", "config", []byte("test"))
@@ -165,6 +169,7 @@ func testValidateMachineUser(t *testing.T, c *configuration.FreyjaConfiguration)
 	}
 }
 
+// testValidateMachineNetwork calls Validate() with modified machine's file configurations
 func testValidateMachineFiles(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationFile := c.Machines[0].Files[0]
 
@@ -246,7 +251,7 @@ func TestBuildEmptyConfiguration(t *testing.T) {
 	}
 }
 
-// TestBuildDefaultConfiguration only checks if minimum required values are set and that default values work
+// TestBuildDefaultConfiguration checks if minimum required values are set and that default values are valid
 func TestBuildDefaultConfiguration(t *testing.T) {
 	// build config
 	var c configuration.FreyjaConfiguration
@@ -254,7 +259,7 @@ func TestBuildDefaultConfiguration(t *testing.T) {
 		log.Printf("Cannot build configuration from file '%s': %v", testFileValidDefaultConfiguration, err)
 		t.Fail()
 	}
-	// test config
+	// test version config
 	expectedVersion := "v0.1.0-beta"
 	if c.Version != expectedVersion {
 		t.Logf("expected version '%s' but got '%s'", expectedVersion, c.Version)
@@ -264,38 +269,59 @@ func TestBuildDefaultConfiguration(t *testing.T) {
 		t.Logf("expected 1 machine %d", len(c.Machines))
 		t.Fail()
 	}
+	// test networks default values
+	if len(c.Networks) != 0 {
+		t.Logf("expected 0 networks %d", len(c.Networks))
+		t.Fail()
+	}
 	// test machine default values
 	m := c.Machines[0]
-	// mandatory values
+	// test machine image default value
 	expectedImage := "/tmp/debian-12-generic-amd64.qcow2"
 	if m.Image != expectedImage {
 		t.Logf("expected image '%s' but got '%s'", expectedImage, m.Image)
 		t.Fail()
 	}
+	// test machine hostname default value
 	expectedHostname := "vm1"
 	if m.Hostname != expectedHostname {
 		t.Logf("expected OS '%s' but got '%s'", expectedHostname, m.Hostname)
 		t.Fail()
 	}
-	// default values
-	// Networks : empty by default
-	if len(m.Networks) != 0 {
-		t.Logf("wrong networks value, expected empty but got '%v'", m.Networks)
+	// test machine networks default values
+	if len(m.Networks) != 1 {
+		t.Logf("wrong networks default value, expected only default but got %d", len(m.Networks))
 		t.Fail()
+	} else {
+		mn := m.Networks[0]
+		if mn.Name != configuration.DefaultInterfaceSourceNetwork {
+			t.Logf("expected default network '%s' but got '%s'", configuration.DefaultInterfaceSourceNetwork, mn.Name)
+			t.Fail()
+		}
+		if mn.Mac != "" {
+			t.Logf("expected empty mac address but got '%s'", mn.Mac)
+		}
 	}
+	// test machine users default values
 	// Users : freyja:master by default
 	if len(m.Users) != 1 {
 		t.Logf("expected only one user but got '%d'", len(m.Users))
 		t.Fail()
 	}
-	if m.Users[0].Name != configuration.DefaultUserName {
+	u := m.Users[0]
+	if u.Name != configuration.DefaultUserName {
 		t.Logf("expected username '%s' but got '%s'", configuration.DefaultUserName, m.Users[0].Name)
 		t.Fail()
 	}
-	if m.Users[0].Password != configuration.DefaultUserPassword {
+	if u.Password != configuration.DefaultUserPassword {
 		t.Logf("expected password '%s' but got '%s'", configuration.DefaultUserPassword, m.Users[0].Password)
 		t.Fail()
 	}
+	if u.Sudo {
+		t.Logf("expected user as sudoer to be false but got true")
+		t.Fail()
+	}
+	// TODO test auto ssh key generation by default
 	// Storage
 	if m.Storage != configuration.DefaultMachineStorage {
 		t.Logf("expected storage '%d' but got '%d'", configuration.DefaultMachineStorage, m.Storage)
@@ -311,17 +337,17 @@ func TestBuildDefaultConfiguration(t *testing.T) {
 		t.Logf("expected vcpu '%d' but got '%d'", configuration.DefaultMachineVcpu, m.Vcpu)
 		t.Fail()
 	}
-	// packages : empty by default
+	// packages empty by default
 	if len(m.Packages) != 0 {
 		t.Logf("wrong packages value, expected empty but got '%v'", m.Networks)
 		t.Fail()
 	}
-	// files : empty by default
+	// files empty by default
 	if len(m.Files) != 0 {
 		t.Logf("wrong files value, expected empty but got '%v'", m.Networks)
 		t.Fail()
 	}
-	// update : false by default
+	// update false by default
 	if m.Update {
 		t.Logf("wrong update value, expected false but got true")
 		t.Fail()
@@ -355,7 +381,30 @@ func TestBuildDefaultFilesConfig(t *testing.T) {
 // TestBuildCompleteConfig checks all the values that can be set in a configuration
 func TestBuildCompleteConfig(t *testing.T) {
 	c := internalTest.BuildCompleteConfig(testFileValidCompleteConfiguration)
-	// test config
+	// test networks config
+	if len(c.Networks) != 2 {
+		t.Logf("expected 2 networks but got %d", len(c.Networks))
+		t.Fail()
+	}
+	n1 := c.Networks[0]
+	if n1.Name != "ctrlplane" {
+		t.Logf("expected network name 'ctrlplane' but got '%s'", n1.Name)
+		t.Fail()
+	}
+	if n1.CIDR != "192.168.123.0/24" {
+		t.Logf("expected CIDR '192.168.123.0/24' but got '%s'", n1.CIDR)
+		t.Fail()
+	}
+	n2 := c.Networks[1]
+	if n2.Name != "dataplane" {
+		t.Logf("expected network name 'dataplane' but got '%s'", n2.Name)
+		t.Fail()
+	}
+	if n2.CIDR != "192.168.124.0/24" {
+		t.Logf("expected CIDR '192.168.124.0/24' but got '%s'", n2.CIDR)
+		t.Fail()
+	}
+	// test machines config
 	// VERSION, HOSTNAME, OS AND IMAGE VALUES ARE ALREADY TESTED IN THE DEFAULT CONFIG TEST
 	if len(c.Machines) != 2 {
 		t.Logf("expected 2 machines but got %d", len(c.Machines))
@@ -367,26 +416,22 @@ func TestBuildCompleteConfig(t *testing.T) {
 		t.Logf("expected 2 networks but got %d", len(m1.Networks))
 		t.Fail()
 	}
-	n1 := m1.Networks[0]
-	if n1.Name != "ctrl-plane" {
-		t.Logf("expected network name 'ctrl-plane' but got '%s'", n1.Name)
+	mn1 := m1.Networks[0]
+	if mn1.Name != "ctrl-plane" {
+		t.Logf("expected network name 'ctrl-plane' but got '%s'", mn1.Name)
 		t.Fail()
 	}
-	if n1.Mac != "52:54:02:aa:bb:cc" {
-		t.Logf("expected network mac '52:54:02:aa:bb:cc' but got '%s'", n1.Mac)
+	if mn1.Mac != "52:54:02:aa:bb:cc" {
+		t.Logf("expected network mac '52:54:02:aa:bb:cc' but got '%s'", mn1.Mac)
 		t.Fail()
 	}
-	if n1.Interface != "virbr0" {
-		t.Logf("expected network interface 'vnet0' but got '%s'", n1.Interface)
+	mn2 := m1.Networks[1]
+	if mn2.Name != "data-plane" {
+		t.Logf("expected network name 'data-plane' but got '%s'", mn2.Name)
 		t.Fail()
 	}
-	n2 := m1.Networks[1]
-	if n2.Name != "data-plane" {
-		t.Logf("expected network name 'data-plane' but got '%s'", n2.Name)
-		t.Fail()
-	}
-	if n2.Mac != "52:54:02:aa:bb:cd" {
-		t.Logf("expected network mac '52:54:02:aa:bb:cd' but got '%s'", n2.Mac)
+	if mn2.Mac != "52:54:02:aa:bb:cd" {
+		t.Logf("expected network mac '52:54:02:aa:bb:cd' but got '%s'", mn2.Mac)
 		t.Fail()
 	}
 	// test users
@@ -465,7 +510,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 		t.Fail()
 	}
 	if f1.Owner != "root:freyja" {
-		t.Logf("expected file Destination 'root:freyja' but got '%s'", f1.Owner)
+		t.Logf("expected file owner 'root:freyja' but got '%s'", f1.Owner)
 		t.Fail()
 	}
 	f2 := m1.Files[1]
@@ -488,11 +533,6 @@ func TestBuildCompleteConfig(t *testing.T) {
 	expectedImage := "/tmp/ubuntu-20.04-LTS-20210603.0.x86_64.qcow2"
 	if m2.Image != expectedImage {
 		t.Logf("expected image '%s' but got '%s'", expectedImage, m2.Image)
-		t.Fail()
-	}
-	expectedOs := "ubuntu20"
-	if m2.Os != expectedOs {
-		t.Logf("expected OS '%s' but got '%s'", expectedOs, m2.Os)
 		t.Fail()
 	}
 	expectedHostname := "vm2"

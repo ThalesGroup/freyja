@@ -682,7 +682,7 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 	//        <interface type="network">
 	//            <mac address="52:54:00:17:49:b7"/>
 	//            <source network="default"/>
-	//            //<address type='pci' domain='0x0000' bus='0x01' slot='0x01' function='0x0'/>
+	//            <address type='pci' domain='0x0000' bus='0x01' slot='0x01' function='0x0'/>
 	//        </interface>
 	var networkInterfaceDevices []XMLDomainDescriptionDevicesInterface
 	if len(cm.Networks) > 0 {

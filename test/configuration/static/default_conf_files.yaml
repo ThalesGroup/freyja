@@ -5,5 +5,5 @@ machines:
     image: "/tmp/CentOS-Stream-GenericCloud-8-20210603.0.x86_64.qcow2" # MANDATORY
     os: "centos8" # MANDATORY
     files:
-      - source: "/tmp/hello.txt"
+      - source: "/tmp/freyja-unit-test/common/hello.txt"
         destination: "/root/hello.txt"

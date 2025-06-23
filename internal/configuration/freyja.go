@@ -30,19 +30,19 @@ const DefaultNetworkName string = "default"
 
 const DefaultNetworkBridgeName string = "virbr0"
 
+const DefaultFilePermissions string = "0600"
+
+const DefaultFileOwner string = "root:root"
+
 // FreyjaConfiguration is the base model for freyja configuration parameters
 // Example :
 // ---
 // version: v0.1.0-beta
 // networks:
-//   - name: ctrl-plane
-//     dhcp:
-//     start: 192.168.123.3
-//     end: 192.168.123.254
-//   - name: data-plane
-//     dhcp:
-//     start: 192.168.124.3
-//     end: 192.168.124.254
+//   - name: ctrlplane
+//     cidr: 192.168.123.0/24
+//   - name: dataplane
+//     cidr: 192.168.124.0/24
 //
 // machines:
 //   - image: "/tmp/CentOS-Stream-GenericCloud-8-20210603.0.x86_64.qcow2" # MANDATORY
@@ -51,7 +51,6 @@ const DefaultNetworkBridgeName string = "virbr0"
 //     networks: # MANDATORY, at least one
 //   - name: "ctrl-plane"
 //     mac: "52:54:02:aa:bb:cc"
-//     interface: "vnet0"
 //   - name: "data-plane"
 //     mac: "52:54:02:aa:bb:cd"
 //     users: # MANDATORY
@@ -94,24 +93,23 @@ type FreyjaConfigurationMachine struct {
 	Storage  uint                                `yaml:"storage"` // GiB
 	Memory   uint                                `yaml:"memory"`  // MiB
 	Vcpu     uint                                `yaml:"vcpu"`
-	Packages []string                            `yaml:"packages"`
-	Cmd      []string                            `yaml:"cmd"`
-	Files    []FreyjaConfigurationFile           `yaml:"files"`
+	Packages []string                            `yaml:"packages,omitempty"`
+	Cmd      []string                            `yaml:"cmd,omitempty"`
+	Files    []FreyjaConfigurationFile           `yaml:"files,omitempty"`
 	Update   bool                                `yaml:"update"`
 	Reboot   bool                                `yaml:"reboot"`
 }
 
 type FreyjaConfigurationMachineNetwork struct {
-	Name      string `yaml:"name"`
-	Mac       string `yaml:"mac"`
-	Interface string `yaml:"interface"`
+	Name string `yaml:"name"`
+	Mac  string `yaml:"mac"`
 }
 
 type FreyjaConfigurationUser struct {
 	Name     string   `yaml:"name"`
 	Password string   `yaml:"password"`
 	Sudo     bool     `yaml:"sudo"`
-	Groups   []string `yaml:"groups"`
+	Groups   []string `yaml:"groups,omitempty"`
 	Keys     []string `yaml:"keys"`
 }
 
@@ -149,40 +147,10 @@ func (c *FreyjaConfiguration) Validate() (err error) {
 		return err
 	}
 	// verify machines
-	if len(c.Machines) == 0 {
-		return errors.New("configure at least one machine but found 0")
+	if err = c.validateMachines(); err != nil {
+		return err
 	}
-	for _, machine := range c.Machines {
-		if machine.Hostname == "" {
-			return errors.New("missing mandatory machine hostname")
-		}
-		if machine.Image == "" {
-			return errors.New("missing mandatory machine image")
-		}
-		if len(machine.Networks) != 0 {
-			// verify networks
-			for _, network := range machine.Networks {
-				err = network.validateMachineNetwork()
-				if err != nil {
-					return &internal.ConfigurationError{Message: err.Error()}
-				}
-			}
-		}
-		// verify users
-		for _, user := range machine.Users {
-			err = user.validateUser()
-			if err != nil {
-				return &internal.ConfigurationError{Message: err.Error()}
-			}
-		}
-		// verify files
-		for _, file := range machine.Files {
-			err = file.validateFiles()
-			if err != nil {
-				return &internal.ConfigurationError{Message: err.Error()}
-			}
-		}
-	}
+
 	return nil
 }
 
@@ -211,14 +179,52 @@ func (c *FreyjaConfiguration) validateNetworks() error {
 		if network.CIDR == "" {
 			return fmt.Errorf("missing network's CIDR")
 		}
-		ip, net, err := net.ParseCIDR(network.CIDR)
+		ip, netName, err := net.ParseCIDR(network.CIDR)
 		if err != nil {
 			return fmt.Errorf("wrong network's CIDR '%s': %w", network.CIDR, err)
 		}
-		if ip == nil || net == nil {
+		if ip == nil || netName == nil {
 			return fmt.Errorf("cannot retrieve IP or Network values from network's cidr value '%s'", network.CIDR)
 		}
 
+	}
+	return nil
+}
+
+func (c *FreyjaConfiguration) validateMachines() (err error) {
+	if len(c.Machines) == 0 {
+		return errors.New("configure at least one machine but found 0")
+	}
+	for _, machine := range c.Machines {
+		if machine.Hostname == "" {
+			return errors.New("missing mandatory machine hostname")
+		}
+		if machine.Image == "" {
+			return errors.New("missing mandatory machine image")
+		}
+		if len(machine.Networks) != 0 {
+			// verify networks
+			for _, network := range machine.Networks {
+				err = network.validateMachineNetwork()
+				if err != nil {
+					return &internal.ConfigurationError{Message: err.Error()}
+				}
+			}
+		}
+		// verify users
+		for _, user := range machine.Users {
+			err = user.validateUser()
+			if err != nil {
+				return &internal.ConfigurationError{Message: err.Error()}
+			}
+		}
+		// verify files
+		for _, file := range machine.Files {
+			err = file.validateMachineFiles()
+			if err != nil {
+				return &internal.ConfigurationError{Message: err.Error()}
+			}
+		}
 	}
 	return nil
 }
@@ -259,11 +265,17 @@ func (cu *FreyjaConfigurationUser) validateUser() error {
 	return nil
 }
 
-// validateFiles validate the machine's configuration for file injection in the filesystem
-func (cf *FreyjaConfigurationFile) validateFiles() error {
+// validateMachineFiles validate the machine's configuration for file injection in the filesystem
+func (cf *FreyjaConfigurationFile) validateMachineFiles() error {
 	// validate source
+	if cf.Source == "" {
+		return errors.New("machine file source config is mandatory but found empty")
+	}
 	if !internal.FileExists(cf.Source) {
-		return errors.New(fmt.Sprintf("configuration not found : '%s' does not exist", cf.Source))
+		return errors.New(fmt.Sprintf("file not found : '%s'", cf.Source))
+	}
+	if cf.Destination == "" {
+		return errors.New("machine file destination config is mandatory but found empty")
 	}
 	// validate permissions
 	if cf.Permissions != "" {
@@ -339,6 +351,8 @@ func (c *FreyjaConfiguration) setDefaultValues() {
 			users[0] = FreyjaConfigurationUser{
 				Name:     DefaultUserName,
 				Password: DefaultUserPassword,
+				Sudo:     false,
+				// TODO generate dynamically an ssh key and set its path on host by default
 			}
 			machine.Users = users
 		} else {
@@ -380,32 +394,18 @@ func (c *FreyjaConfiguration) setDefaultValues() {
 			// default '1' vcpu
 			machine.Vcpu = DefaultMachineVcpu
 		}
-		//if len(machine.Files) != 0 {
-		//	for j, file := range machine.Files {
-		//		if file.Permissions == "" {
-		//			file.Permissions = DefaultFilePermissions
-		//		}
-		//		if file.Owner == "" {
-		//			file.Owner = DefaultFileOwner
-		//		}
-		//		machine.Files[j] = file
-		//	}
-		//}
-
-		c.Machines[i] = machine
-	}
-}
-
-// setUsers set default user if needed
-func (c *FreyjaConfiguration) setUsers() {
-	//machines := make([]FreyjaConfigurationMachine, len(c.Machines))
-	for i, machine := range c.Machines {
-		users := make([]FreyjaConfigurationUser, 1)
-		users[0] = FreyjaConfigurationUser{
-			Name:     DefaultUserName,
-			Password: DefaultUserPassword,
+		if len(machine.Files) != 0 {
+			for j, file := range machine.Files {
+				if file.Permissions == "" {
+					file.Permissions = DefaultFilePermissions
+				}
+				if file.Owner == "" {
+					file.Owner = DefaultFileOwner
+				}
+				machine.Files[j] = file
+			}
 		}
-		machine.Users = users
+
 		c.Machines[i] = machine
 	}
 }

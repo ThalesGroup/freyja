@@ -4,15 +4,12 @@ output:
     all: '>> /var/log/cloud-init.log'
 users:
     - name: sam
-      sudo:
-        - ALL=(ALL) NOPASSWD:ALL
+      sudo: ALL=(ALL) NOPASSWD:ALL
       lock_passwd: false
       shell: /bin/bash
       passwd: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx."
-      groups: group1,group2,sudo
-      ssh_authorized_keys:
-        - key
-        - key
+      groups: "group1,group2,sudo"
+      ssh_authorized_keys: [key, key]
     - name: frodo
       lock_passwd: false
       shell: /bin/bash
@@ -31,6 +28,8 @@ write_files:
     - content: d29ybGQ=
       encoding: base64
       path: /home/sam/world.txt
+      permissions: "0600"
+      owner: root:root
 runcmd:
     - echo 'hello world !' > /tmp/test.txt
     - cat /tmp/test.txt

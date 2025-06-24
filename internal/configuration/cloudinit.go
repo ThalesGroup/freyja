@@ -336,9 +336,9 @@ func (ci *CloudInitUserData) Write(directory string) (err error) {
 // NETWORK CONFIG
 
 // Build the network-config data model from the freyja configuration.
-// Just like meta-data and user-data models, this model must be generated in yaml and included
+// Just like meta-data and user-data models, this model must be generated in YAML and included
 // within the cloud-init ISO file for provisioning.
-// This function must take as input the network associated to the machine.
+// This function must take as the input the network associated with the machine.
 // If none, no need to configure the networks in cloud-init because libvirt will use the default
 // configuration.
 // Otherwise, this function must take every network configured for this machine and compute the

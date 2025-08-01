@@ -14,6 +14,8 @@ import (
 // DATA MODEL
 // **********
 
+type DomainType string
+
 type OSArch string
 
 type MemoryUnit string
@@ -23,6 +25,10 @@ type VcpuPlacement string
 type LibOsInfoId string
 
 type OSBootDev string
+
+type OSType string
+
+type OSArchitecture string
 
 type DevicesEmulator string
 
@@ -61,75 +67,89 @@ type DeviceConsoleTargetType string
 type NetworkForwardMode string
 
 const (
-	X86OSArch OSArch = "x86_64"
+	DomainTypeKvm DomainType = "kvm"
+)
+
+const DefaultDomainType = DomainTypeKvm
+
+const (
+	MemoryUnitKiB MemoryUnit = "KiB"
+	MemoryUnitMiB MemoryUnit = "MiB"
+)
+
+const DefaultDomainMemoryUnit = MemoryUnitMiB
+
+const (
+	VcpuPlacementStatic VcpuPlacement = "static"
+)
+
+const DefaultDomainVcpuPlacement = VcpuPlacementStatic
+
+const (
+	OsTypeHvm OSType = "hvm"
+)
+
+const DefaultOsType = OsTypeHvm
+
+const (
+	OSArchX86 OSArch = "x86_64"
+)
+
+const DefaultOsArch = OSArchX86
+
+const (
+	OsBootDevHd OSBootDev = "hd"
+)
+
+const DefaultOSBootDev = OsBootDevHd
+
+const (
+	DevicesEmulatorQemuX86 DevicesEmulator = "/usr/bin/qemu-system-x86_64"
+)
+
+const DefaultDevicesEmulator = DevicesEmulatorQemuX86
+
+const (
+	DeviceDiskClassGeneric DeviceDiskClass = "disk"
+	DeviceDiskClassCdrom   DeviceDiskClass = "cdrom"
+)
+
+const DefaultDiskDeviceClass = DeviceDiskClassGeneric
+
+const (
+	DeviceDiskTypeFile DeviceDiskType = "file"
+)
+
+const DefaultDeviceDiskType = DeviceDiskTypeFile
+
+const (
+	DeviceDiskDriverNameQemu DeviceDiskDriverName = "qemu"
 )
 
 const (
-	KiBMemoryUnit MemoryUnit = "KiB"
-	MiBMemoryUnit MemoryUnit = "MiB"
+	DeviceDiskDriverTypeQcow DeviceDiskDriverType = "qcow2"
+	DeviceDiskDriverTypeRaw  DeviceDiskDriverType = "raw"
 )
 
 const (
-	StaticVcpuPlacement VcpuPlacement = "static"
+	DeviceDiskTargetBusVirtio DeviceDiskTargetBus = "virtio"
+	DeviceDiskTargetBusSata   DeviceDiskTargetBus = "sata"
+	DeviceDiskTargetBusIde    DeviceDiskTargetBus = "ide"
 )
 
 const (
-	HdOsBootDev OSBootDev = "hd"
+	DeviceDiskTargetDevVda DeviceDiskTargetDev = "vda"
+	DeviceDiskTargetDevSda DeviceDiskTargetDev = "sda"
+	DeviceDiskTargetDevHda DeviceDiskTargetDev = "hda"
+	DeviceDiskTargetDevHdb DeviceDiskTargetDev = "hdb"
 )
 
 const (
-	QemuX86DevicesEmulator DevicesEmulator = "/usr/bin/qemu-system-x86_64"
+	DeviceInterfaceTypeNetwork DeviceInterfaceType = "network"
 )
 
 const (
-	DiskDeviceType  DeviceDiskClass = "disk"
-	CdromDeviceType DeviceDiskClass = "cdrom"
-)
-
-const (
-	FileDeviceDiskType DeviceDiskType = "file"
-)
-
-const (
-	QemuDeviceDiskDriverName DeviceDiskDriverName = "qemu"
-)
-
-const (
-	QcowDeviceDiskDriverType DeviceDiskDriverType = "qcow2"
-	RawDeviceDiskDriverType  DeviceDiskDriverType = "raw"
-)
-
-const (
-	VirtioDeviceDiskTargetBus DeviceDiskTargetBus = "virtio"
-	SataDeviceDiskTargetBus   DeviceDiskTargetBus = "sata"
-	IdeDeviceDiskTargetBus    DeviceDiskTargetBus = "ide"
-)
-
-const (
-	VdaDeviceDiskTargetDev DeviceDiskTargetDev = "vda"
-	SdaDeviceDiskTargetDev DeviceDiskTargetDev = "sda"
-	HdaDeviceDiskTargetDev DeviceDiskTargetDev = "hda"
-	HdbDeviceDiskTargetDev DeviceDiskTargetDev = "hdb"
-)
-
-const (
-	NetworkDeviceInterfaceType DeviceInterfaceType = "network"
-)
-
-const (
-	PciDeviceInterfaceAddressType DeviceInterfaceAddressType = "pci"
-)
-
-const (
-	DefaultDeviceInterfaceAddressDomain DeviceInterfaceAddressDomain = "0x0000"
-)
-
-const (
-	DefaultDeviceInterfaceAddressBus DeviceInterfaceAddressBus = "0x00"
-)
-
-const (
-	DefaultDeviceInterfaceAddressFunction DeviceInterfaceAddressFunction = "0x0"
+	DeviceInterfaceAddressTypePci DeviceInterfaceAddressType = "pci"
 )
 
 const (
@@ -140,46 +160,34 @@ const (
 )
 
 const (
-	PtyDeviceSerialType DeviceSerialType = "pty"
+	DeviceConsoleTypePty DeviceConsoleType = "pty"
 )
 
 const (
-	IsaDeviceSerialTargetType DeviceSerialTargetType = "isa-serial"
+	DeviceConsoleTargetTypeSerial DeviceConsoleType = "serial"
 )
 
-const (
-	IsaDeviceSerialTargetModelName DeviceSerialTargetModelName = "isa-serial"
-)
-
-const (
-	PtyDeviceConsoleType DeviceConsoleType = "pty"
-)
-
-const (
-	SerialDeviceConsoleTargetType DeviceConsoleType = "serial"
-)
-
-const DefaultDomainType string = "kvm"
-
-const DefaultDeviceInterfaceType = string(NetworkDeviceInterfaceType)
+const DefaultDeviceInterfaceType = string(DeviceInterfaceTypeNetwork)
 
 const DefaultNetworkForwardMode = string(NetworkForwardModeNat)
 
-const DefaultInterfaceSourceBridge string = "virbr0"
-
-const DefaultInterfaceAddressType string = string(PciDeviceInterfaceAddressType)
+const DefaultInterfaceAddressType string = string(DeviceInterfaceAddressTypePci)
 
 const DefaultInterfaceModelType string = "virtio"
 
 const DefaultInterfaceSourceNetwork string = "default"
 
-const DefaultOsType string = "hvm"
+const DefaultDeviceInterfaceAddressDomain string = "0x0000"
+
+const DefaultDeviceInterfaceAddressBus string = "0x00"
+
+const DefaultDeviceInterfaceAddressFunction string = "0x0"
 
 var DefaultDeviceInterface = XMLDomainDescriptionDevicesInterface{
 	Type: DefaultDeviceInterfaceType,
-	//Mac:     nil,
+	//Mac: nil,
 	Source: &XMLDomainDescriptionDevicesInterfaceSource{
-		//Bridge:  DefaultInterfaceSourceBridge,
+		//Bridge: DefaultInterfaceSourceBridge,
 		Network: DefaultInterfaceSourceNetwork,
 	},
 	Model: &XMLDomainDescriptionDevicesInterfaceModel{
@@ -569,31 +577,27 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 	}
 	// memory
 	mMemory := XMLDomainDescriptionMemory{
-		Unit:  string(MiBMemoryUnit),
+		Unit:  string(DefaultDomainMemoryUnit),
 		Value: uint64(cm.Memory),
 	}
 	// cpu
 	//mVcpu := cm.Vcpu
 	mVcpu := XMLDomainDescriptionVcpu{
-		Placement: string(StaticVcpuPlacement),
+		Placement: string(DefaultDomainVcpuPlacement),
 		Value:     uint64(cm.Vcpu),
 	}
 	// OS description
-	Arch := string(X86OSArch)
 	mOSType := XMLDomainDescriptionOSType{
-		Type: DefaultOsType,
-		Arch: Arch,
+		Type: string(DefaultOsType),
+		Arch: string(DefaultOsArch),
 	}
 	mOSBoot := XMLDomainDescriptionOSBoot{
-		Dev: string(HdOsBootDev),
+		Dev: string(DefaultOSBootDev),
 	}
 	mOS := XMLDomainDescriptionOS{
 		Type: &mOSType,
 		Boot: &mOSBoot,
 	}
-	// metadata
-	// TODO : find a way to get the proper os type from golang
-	//  for now, no metadata for os info part
 
 	// live image device
 	//    <disk device="disk" type="file">
@@ -616,11 +620,11 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 	// It acts like we already did a snapshot.
 	// It allows multiple machines to use the same root image and boot on their own disk overlay.
 	liveImageDevice := XMLDomainDescriptionDevicesDisk{
-		Device: string(DiskDeviceType),
-		Type:   string(FileDeviceDiskType),
+		Device: string(DefaultDiskDeviceClass),
+		Type:   string(DeviceDiskTypeFile),
 		Driver: &XMLDomainDescriptionDevicesDiskDriver{
-			Name: string(QemuDeviceDiskDriverName),
-			Type: string(QcowDeviceDiskDriverType),
+			Name: string(DeviceDiskDriverNameQemu),
+			Type: string(DeviceDiskDriverTypeQcow),
 		},
 		// !!! WARNING : The order of disk image chain in libvirt is :
 		//    <disk>
@@ -636,9 +640,9 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 			File: os.ExpandEnv(overlayFile),
 		},
 		BackingStore: &XMLDomainDescriptionDevicesDiskBackingStore{
-			Type: string(FileDeviceDiskType),
+			Type: string(DeviceDiskTypeFile),
 			Format: &XMLDomainDescriptionDevicesDiskBackingStoreFormat{
-				Type: string(QcowDeviceDiskDriverType),
+				Type: string(DeviceDiskDriverTypeQcow),
 			},
 			Source: &XMLDomainDescriptionDevicesDiskBackingStoreSource{
 				File: cm.Image,
@@ -646,8 +650,8 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 		},
 		Target: &XMLDomainDescriptionDevicesDiskTarget{
 			// Only works for 'ide' bus type
-			Bus:    string(IdeDeviceDiskTargetBus),
-			Device: string(HdaDeviceDiskTargetDev),
+			Bus:    string(DeviceDiskTargetBusIde),
+			Device: string(DeviceDiskTargetDevHda),
 		},
 	}
 
@@ -662,19 +666,19 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 	//	        <address bus="0" controller="0" target="0" type="drive" unit="0"/>
 	//	    </disk>
 	cloudInitIsoDevice := XMLDomainDescriptionDevicesDisk{
-		Device: string(CdromDeviceType),
-		Type:   string(FileDeviceDiskType),
+		Device: string(DeviceDiskClassCdrom),
+		Type:   string(DeviceDiskTypeFile),
 		Driver: &XMLDomainDescriptionDevicesDiskDriver{
-			Name: string(QemuDeviceDiskDriverName),
-			Type: string(RawDeviceDiskDriverType),
+			Name: string(DeviceDiskDriverNameQemu),
+			Type: string(DeviceDiskDriverTypeRaw),
 		},
 		Source: &XMLDomainDescriptionDevicesDiskSource{
 			File: cloudInitIsoFile,
 		},
 		Target: &XMLDomainDescriptionDevicesDiskTarget{
 			// Only works for 'ide' bus type
-			Bus:    string(IdeDeviceDiskTargetBus),
-			Device: string(HdbDeviceDiskTargetDev),
+			Bus:    string(DeviceDiskTargetBusIde),
+			Device: string(DeviceDiskTargetDevHdb),
 		},
 	}
 
@@ -694,7 +698,7 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 				return nil, fmt.Errorf("cannot get libvirt network slot for network '%s': %w", network.Name, err)
 			}
 			networkInterfaceDevice := XMLDomainDescriptionDevicesInterface{
-				Type: string(NetworkDeviceInterfaceType),
+				Type: string(DeviceInterfaceTypeNetwork),
 				Source: &XMLDomainDescriptionDevicesInterfaceSource{
 					//Bridge:  DefaultInterfaceSourceBridge,
 					Network: network.Name,
@@ -735,10 +739,10 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 					// 0000:01:01.0 for machine interfaces, resulting in the configuration :
 					// <address type='pci' domain='0x0000' bus='0x01' slot='0x01' function='0x0'/>
 					// and we will only increase the slot number per interface
-					Domain:   string(DefaultDeviceInterfaceAddressDomain),
-					Bus:      string(DefaultDeviceInterfaceAddressBus),
+					Domain:   DefaultDeviceInterfaceAddressDomain,
+					Bus:      DefaultDeviceInterfaceAddressBus,
 					Slot:     networkSlot,
-					Function: string(DefaultDeviceInterfaceAddressFunction),
+					Function: DefaultDeviceInterfaceAddressFunction,
 				},
 				//Target: XMLDomainDescriptionDevicesInterfaceTarget{}, // provide if user conf specifies a host interface
 				//Target: nil,
@@ -763,23 +767,23 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 	//	          <target type='serial' port='0'/>
 	//	        </console>
 	consoleDevice := XMLDomainDescriptionDevicesConsole{
-		Type: string(PtyDeviceConsoleType),
+		Type: string(DeviceConsoleTypePty),
 		Target: &XMLDomainDescriptionDevicesConsoleTarget{
-			Type: string(SerialDeviceConsoleTargetType),
+			Type: string(DeviceConsoleTargetTypeSerial),
 		},
 	}
 
 	// xml
 	deviceDisks := []XMLDomainDescriptionDevicesDisk{liveImageDevice, cloudInitIsoDevice}
 	xmlDescription := XMLDomainDescription{
-		Type:   DefaultDomainType,
+		Type:   string(DefaultDomainType),
 		Name:   mName,
 		UUID:   mUUID,
 		Vcpu:   &mVcpu,
 		Memory: &mMemory,
 		OS:     &mOS,
 		Devices: &XMLDomainDescriptionDevices{
-			Emulator:   string(QemuX86DevicesEmulator),
+			Emulator:   string(DevicesEmulatorQemuX86),
 			Disks:      deviceDisks,
 			Interfaces: networkInterfaceDevices,
 			Console:    []XMLDomainDescriptionDevicesConsole{consoleDevice},

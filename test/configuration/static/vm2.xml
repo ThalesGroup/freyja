@@ -1,8 +1,8 @@
 <domain type="kvm">
-    <name>vm1</name>
-    <uuid>7b11e3d1-b4ef-77af-7e81-aa2aba7af47f</uuid>
-    <vcpu placement="static">4</vcpu>
-    <memory unit="MiB">8192</memory>
+    <name>vm2</name>
+    <uuid>36d01e0c-cdf7-d2eb-35ea-55c6d0d47155</uuid>
+    <vcpu placement="static">1</vcpu>
+    <memory unit="MiB">4096</memory>
     <os>
         <type arch="x86_64">hvm</type>
         <boot dev="hd"/>
@@ -11,7 +11,7 @@
         <emulator>/usr/bin/qemu-system-x86_64</emulator>
         <disk device="disk" type="file">
             <driver name="qemu" type="qcow2"/>
-            <source file="/home/kaio/.freyja/machines/vm1/overlay-image.qcow2"/>
+            <source file="/home/kaio/.freyja/machines/vm2/overlay-image.qcow2"/>
             <backingStore type="file">
                 <format type="qcow2"/>
                 <source file="/tmp/debian-12-generic-amd64.qcow2"/>
@@ -20,18 +20,12 @@
         </disk>
         <disk device="cdrom" type="file">
             <driver name="qemu" type="raw"/>
-            <source file="/home/kaio/.freyja/machines/vm1/cloud-init.iso"/>
+            <source file="/home/kaio/.freyja/machines/vm2/cloud-init.iso"/>
             <target bus="ide" dev="hdb"/>
         </disk>
         <interface type="network">
-            <mac address="52:54:02:aa:bb:cc"/>
-            <source network="ctrl-plane"/>
+            <source network="default"/>
             <address type="pci" domain="0x0000" bus="0x00" slot="0x02" function="0x0"/>
-        </interface>
-        <interface type="network">
-            <mac address="52:54:02:aa:bb:cd"/>
-            <source network="data-plane"/>
-            <address type="pci" domain="0x0000" bus="0x00" slot="0x03" function="0x0"/>
         </interface>
         <console type="pty">
             <target type="serial"/>

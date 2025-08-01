@@ -7,8 +7,6 @@ import (
 	"testing"
 )
 
-const FreyjaUnitTestConfigDir string = internalTest.FreyjaUnitTestDir + "/freyja-config"
-
 // TestFileEmptyConfiguration is used to test empty configuration (missing required values)
 const testFileEmptyConfiguration string = "static/empty_conf.yaml"
 
@@ -530,7 +528,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 	}
 	// just testing mandatory values of machine 2 to make sure that the 2 machines are considered
 	m2 := c.Machines[1]
-	expectedImage := "/tmp/ubuntu-20.04-LTS-20210603.0.x86_64.qcow2"
+	expectedImage := "/tmp/debian-12-generic-amd64.qcow2"
 	if m2.Image != expectedImage {
 		t.Logf("expected image '%s' but got '%s'", expectedImage, m2.Image)
 		t.Fail()

@@ -4,6 +4,8 @@ import (
 	"freyja/internal/configuration"
 	internalTest "freyja/test"
 	"log"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -31,20 +33,28 @@ func compareOrderedStringSlices(slice1 []string, slice2 []string) bool {
 	return true
 }
 
+// replaceFirstConfMachine takes the first machine configuration in config and replace it by the
+// given one. Useful for unit tests.
+func replaceFirstConfMachine(c *configuration.FreyjaConfiguration, m *configuration.FreyjaConfigurationMachine) {
+	c.Machines[0] = *m
+}
+
 // replaceFirstConfNetwork takes the first network configuration in config and replace it by the
-// given one. Useful for the unit tests.
+// given one. Useful for unit tests.
 func replaceFirstConfNetwork(c *configuration.FreyjaConfiguration, n *configuration.FreyjaConfigurationMachineNetwork) {
 	c.Machines[0].Networks[0] = *n
 }
 
 // replaceFirstConfUser takes the first user configuration in config and replace it by the
-// given one. Useful for the unit tests.
+// given one. Useful for unit tests.
 func replaceFirstConfUser(c *configuration.FreyjaConfiguration, u *configuration.FreyjaConfigurationUser) {
-	c.Machines[0].Users[0] = *u
+	firstMachine := c.Machines[0]
+	firstMachine.Users[0] = *u
+	c.Machines[0] = firstMachine
 }
 
 // replaceFirstConfFile takes the first file configuration in config and replace it by the
-// given one. Useful for the unit tests.
+// given one. Useful for unit tests.
 func replaceFirstConfFile(c *configuration.FreyjaConfiguration, f *configuration.FreyjaConfigurationFile) {
 	c.Machines[0].Files[0] = *f
 }
@@ -53,6 +63,7 @@ func TestValidate(t *testing.T) {
 	c := internalTest.BuildCompleteConfig(testFileValidCompleteConfiguration)
 	testValidateVersion(t, c)
 	testValidateNetworks(t, c)
+	testValidateMachineImage(t, c)
 	testValidateMachineNetwork(t, c)
 	testValidateMachineUser(t, c)
 	testValidateMachineFiles(t, c)
@@ -106,6 +117,42 @@ func testValidateNetworks(t *testing.T, c *configuration.FreyjaConfiguration) {
 	}
 }
 
+func testValidateMachineImage(t *testing.T, c *configuration.FreyjaConfiguration) {
+	configurationMachine := c.Machines[0]
+	// invalid
+	// image invalid value
+	configurationMachine.Image = "/tmp/null"
+	replaceFirstConfMachine(c, &configurationMachine)
+	err := c.Validate()
+	if err == nil {
+		t.Errorf("Invalid machine image did not raised an error")
+		t.Fail()
+	}
+	// valid
+	// absolute path
+	tempImage1 := internalTest.WriteTempTestFile("image-abs.qcow2", "config", []byte("test"))
+	// env var path
+	file := "image-env.qcow2"
+	tempImage2 := internalTest.WriteTempTestFile(file, "config", []byte("test"))
+	tempImage2ParentDir := filepath.Dir(tempImage2)
+	os.Setenv("TEST_DIR", tempImage2ParentDir)
+	envImage := "$TEST_DIR/" + file
+	// test
+	values := []string{tempImage1, envImage}
+	for _, value := range values {
+		configurationMachine.Image = value
+		replaceFirstConfMachine(c, &configurationMachine)
+		if err = c.SetValues(); err != nil {
+			t.Errorf("SetValues() failed with %s", err)
+			t.FailNow()
+		}
+		if err = c.Validate(); err != nil {
+			t.Errorf("Validate() failed with %s", err)
+			t.Fail()
+		}
+	}
+}
+
 // testValidateMachineNetwork calls Validate() with modified machine's network configurations
 func testValidateMachineNetwork(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationNetwork := c.Machines[0].Networks[0]
@@ -150,7 +197,6 @@ func testValidateMachineNetwork(t *testing.T, c *configuration.FreyjaConfigurati
 // testValidateMachineNetwork calls Validate() with modified machine's user configurations
 func testValidateMachineUser(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationUser := c.Machines[0].Users[0]
-	tempFile := internalTest.WriteTempTestFile("test-valid-user-key.pub", "config", []byte("test"))
 	// invalid
 	configurationUser.Keys = append(configurationUser.Keys, "dumb")
 	replaceFirstConfUser(c, &configurationUser)
@@ -159,8 +205,14 @@ func testValidateMachineUser(t *testing.T, c *configuration.FreyjaConfiguration)
 		t.FailNow()
 	}
 	// valid
-	configurationUser.Keys = []string{tempFile, "/dev/null"}
+	// validate both the abs path and path with env variables
+	tempFileName := "test-valid-user-key.pub"
+	tempFile := internalTest.WriteTempTestFile(tempFileName, "config", []byte("test"))
+	os.Setenv("TEST_DIR", filepath.Dir(tempFile))
+	tempFileEnv := "$TEST_DIR/" + tempFileName
+	configurationUser.Keys = []string{tempFile, tempFileEnv, "/dev/null"}
 	replaceFirstConfUser(c, &configurationUser)
+	c.SetValues()
 	if err := c.Validate(); err != nil {
 		t.Logf("User invalid instead of valid for key values: %v", configurationUser.Keys)
 		t.FailNow()
@@ -183,11 +235,16 @@ func testValidateMachineFiles(t *testing.T, c *configuration.FreyjaConfiguration
 		}
 	}
 	// valid values
-	tempFile := internalTest.WriteTempTestFile("test-valid-file-source.txt", "config", []byte("test"))
-	values = []string{tempFile, "/dev/null"}
+	// validate both the abs path and path with env variables
+	tempFileName := "test-valid-file-source.txt"
+	tempFile := internalTest.WriteTempTestFile(tempFileName, "config", []byte("test"))
+	os.Setenv("TEST_DIR", filepath.Dir(tempFile))
+	tempFileEnv := "$TEST_DIR/" + tempFileName
+	values = []string{tempFile, tempFileEnv, "/dev/null"}
 	for _, value := range values {
 		configurationFile.Source = value
 		replaceFirstConfFile(c, &configurationFile)
+		c.SetValues()
 		if err := c.Validate(); err != nil {
 			t.Logf("Owner invalid instead of valid for value: %s", value)
 			t.Fail()

@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/viper"
 	"log"
 	"net"
+	"os"
 	"path/filepath"
 	"regexp"
 )
@@ -202,6 +203,9 @@ func (c *FreyjaConfiguration) validateMachines() (err error) {
 		if machine.Image == "" {
 			return errors.New("missing mandatory machine image")
 		}
+		if !internal.FileExists(machine.Image) {
+			return fmt.Errorf("image file not found : '%s'", machine.Image)
+		}
 		if len(machine.Networks) != 0 {
 			// verify networks
 			for _, network := range machine.Networks {
@@ -329,7 +333,10 @@ func (c *FreyjaConfiguration) BuildFromFile(path string) error {
 		return err
 	}
 	// set default values if not configured
-	c.setDefaultValues()
+	// also resolve absolute path values if env vars are set instead
+	if err = c.SetValues(); err != nil {
+		return err
+	}
 	// custom user configuration audit
 	if err := c.Validate(); err != nil {
 		return err
@@ -341,10 +348,12 @@ func (c *FreyjaConfiguration) BuildFromFile(path string) error {
 // DEFAULT VALUES SETTERS
 // **********************
 
-// setDefaultValues set values to parameters that have not been configured but are still required
+// SetValues set values to parameters that have not been configured but are still required
 // for libvirt
-func (c *FreyjaConfiguration) setDefaultValues() {
+func (c *FreyjaConfiguration) SetValues() (err error) {
 	for i, machine := range c.Machines {
+		// resolve the image path
+		machine.Image = os.ExpandEnv(machine.Image)
 		// default user
 		if len(machine.Users) == 0 {
 			users := make([]FreyjaConfigurationUser, 1)
@@ -362,6 +371,11 @@ func (c *FreyjaConfiguration) setDefaultValues() {
 				}
 				if user.Password == "" {
 					user.Password = DefaultUserPassword
+				}
+				// TODO generate dynamically an ssh key and set its path on host by default if no
+				//   key
+				for k, key := range user.Keys {
+					user.Keys[k] = os.ExpandEnv(key)
 				}
 				machine.Users[j] = user
 			}
@@ -396,6 +410,8 @@ func (c *FreyjaConfiguration) setDefaultValues() {
 		}
 		if len(machine.Files) != 0 {
 			for j, file := range machine.Files {
+				// expand env variables in the source path
+				file.Source = os.ExpandEnv(file.Source)
 				if file.Permissions == "" {
 					file.Permissions = DefaultFilePermissions
 				}
@@ -408,6 +424,7 @@ func (c *FreyjaConfiguration) setDefaultValues() {
 
 		c.Machines[i] = machine
 	}
+	return nil
 }
 
 // *****

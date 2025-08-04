@@ -271,3 +271,11 @@ func TestGetMachineInterfaceNameFromIndex(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestDeleteme(t *testing.T) {
+	file := "$HOME/.ssh/id_rsa.pub"
+	if !internal.FileExists(file) {
+		t.Errorf("user key file '%s' does not exists", file)
+		t.FailNow()
+	}
+}

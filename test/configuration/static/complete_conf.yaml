@@ -6,7 +6,7 @@ networks: # optional
   - name: dataplane
     cidr: 192.168.124.0/24
 machines: # MANDATORY, at least one
-  - image: "/tmp/debian-12-generic-amd64.qcow2" # MANDATORY
+  - image: "/tmp/freyja-unit-test/common/image1.qcow2" # MANDATORY
     hostname: "vm1" # MANDATORY, MUST NOT contain underscores
     networks: # optional
       - name: "ctrl-plane" # optional, 'default' by default
@@ -39,5 +39,5 @@ machines: # MANDATORY, at least one
         destination: "/home/sam/world.txt"
     update: true # optional, false by default
     reboot: true # optional, false by default
-  - image: "/tmp/debian-12-generic-amd64.qcow2" # MANDATORY
+  - image: "/tmp/freyja-unit-test/common/image2.qcow2" # MANDATORY
     hostname: "vm2" # MANDATORY, MUST NOT contain underscores

@@ -14,6 +14,10 @@ const FreyjaUnitTestDir = "/tmp/freyja-unit-test"
 
 const FreyjaUnitTestDirCommon = FreyjaUnitTestDir + "/common"
 
+const ImageVm1File string = "image1.qcow2"
+
+const ImageVm2File string = "image2.qcow2"
+
 const SamPubFileName string = "sam.pub"
 
 const ExtPubFileName string = "ext.pub"
@@ -22,16 +26,16 @@ const HelloFileName string = "hello.txt"
 
 const WorldFileName string = "world.txt"
 
-// ExpectedSamPubFileContent inject some content in temp file for unit tests
+// ExpectedSamPubFileContent inject some content in the temp file for unit tests
 const ExpectedSamPubFileContent string = "key"
 
-// ExpectedExtPubFileContent inject some content in temp file for unit tests
+// ExpectedExtPubFileContent inject some content in the temp file for unit tests
 const ExpectedExtPubFileContent string = "key"
 
-// ExpectedHelloFileContent inject some content in temp file for unit tests
+// ExpectedHelloFileContent inject some content in the temp file for unit tests
 const ExpectedHelloFileContent string = "hello"
 
-// ExpectedWorldFileContent inject some content in temp file for unit tests
+// ExpectedWorldFileContent inject some content in the temp file for unit tests
 const ExpectedWorldFileContent string = "world"
 
 func WriteTempTestFile(name string, parentDirName string, content []byte) string {
@@ -87,6 +91,9 @@ func WriteRandomBytesTempFile(t *testing.T, name string, parentDirName string) i
 func BuildCompleteConfig(relativePath string) *configuration.FreyjaConfiguration {
 	parentDir := "common"
 	// mandatory files for the test
+	WriteTempTestFile(ImageVm1File, parentDir, []byte("any"))
+	WriteTempTestFile(ImageVm2File, parentDir, []byte("any"))
+	WriteTempTestFile(WorldFileName, parentDir, []byte(ExpectedWorldFileContent))
 	WriteTempTestFile(SamPubFileName, parentDir, []byte(ExpectedSamPubFileContent))
 	WriteTempTestFile(ExtPubFileName, parentDir, []byte(ExpectedExtPubFileContent))
 	WriteTempTestFile(HelloFileName, parentDir, []byte(ExpectedHelloFileContent))

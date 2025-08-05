@@ -91,7 +91,7 @@ func deleteNetworksByName(names []string) (err error) {
 			} else {
 				Logger.Info("removed network directory", "path", networkDirPath)
 			}
-
+			deletedNetworks = append(deletedNetworks, name)
 		}
 	} else {
 		Logger.Info("Canceled")

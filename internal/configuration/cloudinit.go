@@ -237,7 +237,7 @@ func (ci *CloudInitUserData) Build(machine *FreyjaConfigurationMachine) error {
 				if err != nil {
 					return err
 				}
-				keys[j] = string(content)
+				keys[j] = strings.TrimSuffix(string(content), "\n")
 			}
 			ciu.SshAuthorizedKeys = keys
 		}

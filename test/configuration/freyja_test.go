@@ -1,6 +1,7 @@
 package configuration
 
 import (
+	"fmt"
 	"freyja/internal/configuration"
 	internalTest "freyja/test"
 	"log"
@@ -39,9 +40,9 @@ func replaceFirstConfMachine(c *configuration.FreyjaConfiguration, m *configurat
 	c.Machines[0] = *m
 }
 
-// replaceFirstConfNetwork takes the first network configuration in config and replace it by the
+// replaceFirstConfMachineNetwork takes the first network configuration in config and replace it by the
 // given one. Useful for unit tests.
-func replaceFirstConfNetwork(c *configuration.FreyjaConfiguration, n *configuration.FreyjaConfigurationMachineNetwork) {
+func replaceFirstConfMachineNetwork(c *configuration.FreyjaConfiguration, n *configuration.FreyjaConfigurationMachineNetwork) {
 	c.Machines[0].Networks[0] = *n
 }
 
@@ -100,7 +101,7 @@ func testValidateNetworks(t *testing.T, c *configuration.FreyjaConfiguration) {
 			t.Logf("network missing name did not raised an error")
 			t.Fail()
 		}
-		network.Name = "valid" // make it valid again
+		network.Name = fmt.Sprintf("valid%d", i) // make it valid again
 
 		invalidValues := []string{"", "aosidfiabjk", "10.11.12.1", "12.12.12.12.12/24"}
 		for _, value := range invalidValues {
@@ -159,21 +160,21 @@ func testValidateMachineNetwork(t *testing.T, c *configuration.FreyjaConfigurati
 	// invalid name value
 	// error should be raised here
 	configurationNetwork.Name = ""
-	replaceFirstConfNetwork(c, &configurationNetwork)
+	replaceFirstConfMachineNetwork(c, &configurationNetwork)
 	err := c.Validate()
 	if err == nil {
 		t.Logf("Name valid instead of invalid because empty")
 		t.Fail()
 	}
 	// make the name valid for further tests
-	configurationNetwork.Name = "test"
-	replaceFirstConfNetwork(c, &configurationNetwork)
+	configurationNetwork.Name = "data-plane"
+	replaceFirstConfMachineNetwork(c, &configurationNetwork)
 	// invalid mac addresses
 	// errors should be raised here
 	values := []string{"001b:63:84:45:e6", "01:63:84:45:a", "001b638445e6", "xx:1b:63:84:45:e6"}
 	for _, value := range values {
 		configurationNetwork.Mac = value
-		replaceFirstConfNetwork(c, &configurationNetwork)
+		replaceFirstConfMachineNetwork(c, &configurationNetwork)
 		err = c.Validate()
 		if err == nil {
 			t.Logf("Mac address valid instead of invalid for value: %s", value)
@@ -184,7 +185,7 @@ func testValidateMachineNetwork(t *testing.T, c *configuration.FreyjaConfigurati
 	values = []string{"00:1b:63:84:45:e6", "00-1B-63-84-45-E6"}
 	for _, value := range values {
 		configurationNetwork.Mac = value
-		replaceFirstConfNetwork(c, &configurationNetwork)
+		replaceFirstConfMachineNetwork(c, &configurationNetwork)
 		err = c.Validate()
 		if err != nil {
 			t.Logf("Mac address invalid instead of valid for value: %s", value)

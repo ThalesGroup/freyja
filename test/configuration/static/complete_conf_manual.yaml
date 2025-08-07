@@ -6,7 +6,7 @@ networks: # optional
   - name: data-plane
     cidr: 192.168.124.0/24
 machines: # MANDATORY, at least one
-  - image: "/tmp/freyja-unit-test/common/image1.qcow2" # MANDATORY
+  - image: "$HOME/Images/debian12" # MANDATORY
     hostname: "vm1" # MANDATORY, MUST NOT contain underscores
     networks: # optional
       - name: "ctrl-plane" # optional, 'default' by default
@@ -18,8 +18,8 @@ machines: # MANDATORY, at least one
         password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # optional, default 'master'
         sudo: true # optional, 'false' by default
         keys: # Optional, default '$HOME/.ssh/vm1.pub'
-          - "/tmp/freyja-unit-test/common/sam.pub"
-          - "/tmp/freyja-unit-test/common/ext.pub"
+          - "$HOME/.ssh/id_rsa.pub"
+          - "$HOME/.ssh/id_ed25519.pub"
         groups: ["group1", "group2"] # optional, empty by default
       - name: "frodo"
         password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # MANDATORY, here 'master'
@@ -39,5 +39,5 @@ machines: # MANDATORY, at least one
         destination: "/home/sam/world.txt"
     update: true # optional, false by default
     reboot: true # optional, false by default
-  - image: "/tmp/freyja-unit-test/common/image2.qcow2" # MANDATORY
+  - image: "$HOME/Images/debian12"
     hostname: "vm2" # MANDATORY, MUST NOT contain underscores

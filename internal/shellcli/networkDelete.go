@@ -7,6 +7,7 @@ import (
 	"github.com/digitalocean/go-libvirt"
 	"github.com/spf13/cobra"
 	"os"
+	"strings"
 )
 
 var networkNames []string
@@ -76,11 +77,12 @@ func deleteNetworksByName(names []string) (err error) {
 	if internal.AskUserYesNoConfirmation() {
 		for _, name := range names {
 			network, errD := LibvirtConnexion.NetworkLookupByName(name)
-			if errD != nil {
-				Logger.Warn("skipped network deletion in libvirt", "network", name, "reason", errD.Error())
-			} else if errD = deleteNetworkInLibvirt(network); errD != nil {
-				// delete in libvirt
-				Logger.Error("cannot delete network in libvirt", "network", name, "reason", errD.Error())
+			if errD = deleteNetworkInLibvirt(network); errD != nil {
+				return fmt.Errorf("cannot delete network in libvirt: %w", &internal.NetworkError{
+					Network: name,
+					Message: errD.Error(),
+				})
+
 			}
 
 			// delete config dirs
@@ -89,16 +91,17 @@ func deleteNetworksByName(names []string) (err error) {
 			if errRemoveDir != nil {
 				Logger.Error("cannot remove network directory", "path", networkDirPath, "reason", errRemoveDir.Error())
 			} else {
-				Logger.Info("removed network directory", "path", networkDirPath)
+				Logger.Debug("removed network directory", "path", networkDirPath)
 			}
 			deletedNetworks = append(deletedNetworks, name)
+			Logger.Info("network deleted", "network", name)
 		}
 	} else {
-		Logger.Info("Canceled")
+		Logger.Info("canceled")
 		return nil
 	}
 
-	Logger.Info("Networks deleted", "networks", deletedNetworks)
+	Logger.Info("networks deleted", "networks", deletedNetworks)
 	return err
 }
 
@@ -106,8 +109,16 @@ func deleteNetworksByName(names []string) (err error) {
 func deleteNetworkInLibvirt(network libvirt.Network) (err error) {
 	// destroy
 	if err = LibvirtConnexion.NetworkDestroy(network); err != nil {
-		return fmt.Errorf("cannot destroy network '%s' in libvirt: %v", network.Name, err.Error())
-	} else if err = LibvirtConnexion.NetworkUndefine(network); err != nil {
+		if strings.Contains(err.Error(), "is not active") {
+			Logger.Debug("skipped network destroy phase in libvirt because network was not active", "network", network.Name)
+		} else {
+			return fmt.Errorf("cannot destroy network in libvirt: %w", &internal.NetworkError{
+				Network: network.Name,
+				Message: err.Error(),
+			})
+		}
+	}
+	if err = LibvirtConnexion.NetworkUndefine(network); err != nil {
 		// undefine
 		return fmt.Errorf("cannot undefine network '%s' in libvirt: %v", network.Name, err.Error())
 	}

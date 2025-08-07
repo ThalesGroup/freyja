@@ -27,7 +27,8 @@ const HelloFileName string = "hello.txt"
 const WorldFileName string = "world.txt"
 
 // ExpectedSamPubFileContent inject some content in the temp file for unit tests
-const ExpectedSamPubFileContent string = "key"
+// we leave '\n' on purpose, it has to be removed if present in the key's string
+const ExpectedSamPubFileContent string = "key\n"
 
 // ExpectedExtPubFileContent inject some content in the temp file for unit tests
 const ExpectedExtPubFileContent string = "key"

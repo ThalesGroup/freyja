@@ -2,6 +2,7 @@ package shellcli
 
 import (
 	"fmt"
+	"freyja/internal"
 	"freyja/internal/configuration"
 	"github.com/spf13/cobra"
 	"log"
@@ -146,7 +147,15 @@ func CreateNetworksInLibvirt(xmlDescriptions map[string][]byte) error {
 		}
 
 		if err = LibvirtConnexion.NetworkCreate(net); err != nil {
-			return fmt.Errorf("cannot create network in libvirt: %w", err)
+			if strings.Contains(err.Error(), "Network is already in use") {
+				// network already exists in libvirt
+				return fmt.Errorf("network already created in libvirt: %w", &internal.NetworkAlreadyExistsError{
+					Network: name,
+					Message: err.Error(),
+				})
+			} else {
+				return fmt.Errorf("cannot create network in libvirt: %w", err)
+			}
 		}
 
 		if err = LibvirtConnexion.NetworkSetAutostart(net, RemoteProcNetworkSetAutostart); err != nil {

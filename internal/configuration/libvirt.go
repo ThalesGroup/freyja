@@ -6,8 +6,9 @@ import (
 	"encoding/xml"
 	"fmt"
 	"freyja/internal"
-	"github.com/google/uuid"
 	"os"
+
+	"github.com/google/uuid"
 )
 
 // **********
@@ -183,6 +184,8 @@ const DefaultDeviceInterfaceAddressBus string = "0x00"
 
 const DefaultDeviceInterfaceAddressFunction string = "0x0"
 
+const DefaultDeviceConsoleTargetPort int = 0
+
 var DefaultDeviceInterface = XMLDomainDescriptionDevicesInterface{
 	Type: DefaultDeviceInterfaceType,
 	//Mac: nil,
@@ -195,7 +198,7 @@ var DefaultDeviceInterface = XMLDomainDescriptionDevicesInterface{
 	},
 }
 
-// XMLDomainDescription
+// XMLDomainDescription https://libvirt.org/formatdomain.html
 // Assuming you have the XML description already obtained from the domain object
 // Parse the XML description to extract network interface information
 // Here's an example of a struct that can be used to unmarshal the network interface information
@@ -465,11 +468,18 @@ type XMLDomainDescriptionDevicesConsole struct {
 	XMLName xml.Name                                  `xml:"console"`
 	Type    string                                    `xml:"type,attr"`
 	Target  *XMLDomainDescriptionDevicesConsoleTarget `xml:"target"`
+	Alias   *XMLDomainDescriptionDevicesConsoleAlias  `xml:"alias"`
 }
 
 type XMLDomainDescriptionDevicesConsoleTarget struct {
 	XMLName xml.Name `xml:"target"`
 	Type    string   `xml:"type,attr"`
+	Port    int      `xml:"port,attr"`
+}
+
+type XMLDomainDescriptionDevicesConsoleAlias struct {
+	XMLName xml.Name `xml:"alias"`
+	Name    string   `xml:"name,attr"`
 }
 
 // XMLNetworkDescription example
@@ -765,11 +775,16 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 	// console device for graphical debug
 	//	        <console type='pty'>
 	//	          <target type='serial' port='0'/>
+	//			  <alias name='serial0' />
 	//	        </console>
 	consoleDevice := XMLDomainDescriptionDevicesConsole{
 		Type: string(DeviceConsoleTypePty),
 		Target: &XMLDomainDescriptionDevicesConsoleTarget{
 			Type: string(DeviceConsoleTargetTypeSerial),
+			Port: DefaultDeviceConsoleTargetPort,
+		},
+		Alias: &XMLDomainDescriptionDevicesConsoleAlias{
+			Name: fmt.Sprintf("%s%d", string(DeviceConsoleTargetTypeSerial), DefaultDeviceConsoleTargetPort),
 		},
 	}
 

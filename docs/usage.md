@@ -78,3 +78,9 @@ freyja network info
 # filter by name
 freyja network info net1 net2
 ```
+
+Start a machine and print boot logs :
+
+```sh
+freyja machine create -c config.yaml && freyja machine console -n mymachine
+```

@@ -23,4 +23,5 @@ func init() {
 	MachineCmd.AddCommand(machineDeleteCmd)
 	MachineCmd.AddCommand(machineListCmd)
 	MachineCmd.AddCommand(machineInfoCmd)
+	MachineCmd.AddCommand(machineConsoleCmd)
 }

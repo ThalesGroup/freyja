@@ -1,14 +1,17 @@
 package internal
 
 import (
+	"crypto/ed25519"
 	b64 "encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
 	"net"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
+
+	"github.com/google/uuid"
 )
 
 // Prompt
@@ -86,6 +89,10 @@ func EncodeB64Bytes(b []byte) string {
 }
 
 // Files
+
+func GetAbsPath(path string) (absPath string, err error) {
+	return filepath.Abs(os.ExpandEnv(path))
+}
 
 func FileExists(path string) bool {
 	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
@@ -190,3 +197,7 @@ func GetMachineInterfaceFromSlotAddress(slotAddress string) (string, error) {
 
 	return fmt.Sprintf("enp0s%d", value), nil
 }
+
+// ***
+// SSH
+// ***

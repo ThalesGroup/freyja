@@ -4,13 +4,16 @@ import (
 	"errors"
 	"fmt"
 	"freyja/internal"
-	"github.com/spf13/viper"
 	"log"
 	"net"
 	"os"
 	"path/filepath"
 	"regexp"
+
+	"github.com/spf13/viper"
 )
+
+const Version string = "0.1.0-beta-go"
 
 // DefaultUserName = freyja
 const DefaultUserName string = "freyja"
@@ -34,6 +37,16 @@ const DefaultNetworkBridgeName string = "virbr0"
 const DefaultFilePermissions string = "0600"
 
 const DefaultFileOwner string = "root:root"
+
+const SSHPublicKeySuffix = "_ed25519.pub"
+
+const SSHPrivateKeySuffix = "_ed25519"
+
+var FreyjaWorkspaceDir = filepath.Join(os.Getenv("HOME"), ".freyja")
+
+var FreyjaMachinesWorkspaceDir = filepath.Join(FreyjaWorkspaceDir, "machines")
+
+var FreyjaNetworksWorkspaceDir = filepath.Join(FreyjaWorkspaceDir, "networks")
 
 // FreyjaConfiguration is the base model for freyja configuration parameters
 // Example :
@@ -132,12 +145,14 @@ type Configuration interface {
 	BuildFromFile(path string) error
 }
 
-// ************
-// CONFIG AUDIT
-// ************
+// *****************
+// CONFIG VALIDATION
+// *****************
 
-// Validate audits the whole freyja configuration for content mistakes
-// mistake = configuration value that may cause further issues during machine creation in libvirt
+// Validate checks the whole freyja configuration values for mistakes, misconfigurations, wrong
+// formats, etc ...
+// Validate is different from Audit
+// mistake = wrong configuration value that may cause build configuration issues
 func (c *FreyjaConfiguration) Validate() (err error) {
 	// verify version
 	if err = c.validateVersion(); err != nil {
@@ -157,16 +172,8 @@ func (c *FreyjaConfiguration) Validate() (err error) {
 
 // ValidateVersion audits the version configuration
 func (c *FreyjaConfiguration) validateVersion() error {
-	if c.Version == "" {
-		return errors.New("missing version value")
-	}
-	regex := "^[a-z]*[0-9]+\\.[0-9]+.*$"
-	match, err := regexp.MatchString(regex, c.Version)
-	if err != nil {
-		return fmt.Errorf("cannot verify pattern matching for string '%s': %w", c.Version, err)
-	}
-	if !match {
-		return errors.New(fmt.Sprintf("wrong version format : regex is '%s' but found value '%s'", regex, c.Version))
+	if c.Version != Version {
+		return errors.New(fmt.Sprintf("wrong version format : current version is '%s' but found '%s'", Version, c.Version))
 	}
 	return nil
 }
@@ -215,13 +222,6 @@ func (c *FreyjaConfiguration) validateMachines() (err error) {
 				}
 			}
 		}
-		// verify users
-		for _, user := range machine.Users {
-			err = user.validateUser()
-			if err != nil {
-				return &internal.ConfigurationError{Message: err.Error()}
-			}
-		}
 		// verify files
 		for _, file := range machine.Files {
 			err = file.validateMachineFiles()
@@ -255,28 +255,11 @@ func (cn *FreyjaConfigurationMachineNetwork) validateMachineNetwork() error {
 	return nil
 }
 
-// ValidateUser audits the user configuration including
-//   - the path of the keys on the host
-func (cu *FreyjaConfigurationUser) validateUser() error {
-	if len(cu.Keys) > 0 {
-		for _, key := range cu.Keys {
-			// check if the key path's file exists
-			if !internal.FileExists(key) {
-				return fmt.Errorf("user key file '%s' does not exists", key)
-			}
-		}
-	}
-	return nil
-}
-
 // validateMachineFiles validate the machine's configuration for file injection in the filesystem
 func (cf *FreyjaConfigurationFile) validateMachineFiles() error {
 	// validate source
 	if cf.Source == "" {
 		return errors.New("machine file source config is mandatory but found empty")
-	}
-	if !internal.FileExists(cf.Source) {
-		return errors.New(fmt.Sprintf("file not found : '%s'", cf.Source))
 	}
 	if cf.Destination == "" {
 		return errors.New("machine file destination config is mandatory but found empty")
@@ -301,6 +284,60 @@ func (cf *FreyjaConfigurationFile) validateMachineFiles() error {
 		}
 		if !match {
 			return errors.New(fmt.Sprintf("wrong file owner : value '%s' does not match pattern '%s'", cf.Owner, pattern))
+		}
+	}
+	return nil
+}
+
+// *****
+// AUDIT
+// *****
+
+// Audit is different from Validate
+// Audit verifies if the environment and host conditions are met to create the machine.
+// For example, it verifies if provision files exist on host, if the ssh keys in the configuration
+// already exist or have been created before the machine instantiation, etc ...
+// Thus, the purpose of this function is to be called later than Validate, after that the
+// configurations and all the required environment has been generated.
+func (cm *FreyjaConfigurationMachine) Audit() (err error) {
+
+	// image
+	absImage, err := filepath.Abs(os.ExpandEnv(cm.Image))
+	if !internal.FileExists(absImage) {
+		return &internal.ConfigurationError{Message: fmt.Sprintf("Machine Image File '%s' of machine '%s' not found", cm.Image, cm.Hostname)}
+	}
+	// users
+	for _, user := range cm.Users {
+		if err = user.AuditUser(); err != nil {
+			return &internal.ConfigurationError{Message: err.Error()}
+		}
+	}
+	// files
+	for _, file := range cm.Files {
+		absPath, err := filepath.Abs(os.ExpandEnv(file.Source))
+		if err != nil {
+			return &internal.ConfigurationError{Message: err.Error()}
+		}
+		if !internal.FileExists(absPath) {
+			return &internal.ConfigurationError{Message: fmt.Sprintf("file's source '%s' of machine '%s' does not exists", file.Source, cm.Hostname)}
+		}
+	}
+
+	return nil
+}
+
+func (cu *FreyjaConfigurationUser) AuditUser() (err error) {
+	if len(cu.Keys) == 0 {
+		return fmt.Errorf("user '%s' keys is mandatory but found empty", cu.Name)
+	} else {
+		for _, key := range cu.Keys {
+			absPath, err := internal.GetAbsPath(key)
+			if err != nil {
+				return fmt.Errorf("cannot retrieve absolute path of file '%s' for user '%s'", key, cu.Name)
+			}
+			if !internal.FileExists(absPath) {
+				return fmt.Errorf("user '%s' key file '%s' does not exists", cu.Name, key)
+			}
 		}
 	}
 	return nil
@@ -351,6 +388,13 @@ func (c *FreyjaConfiguration) BuildFromFile(path string) error {
 // SetValues set values to parameters that have not been configured but are still required
 // for libvirt
 func (c *FreyjaConfiguration) SetValues() (err error) {
+	// the user is not the user of the machines in the config
+	// it relates to the user that launched freyja
+	userHomeDir, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("cannot get user's home directory: %w", err)
+	}
+	userSSHDir := filepath.Join(userHomeDir, ".ssh")
 	for i, machine := range c.Machines {
 		// resolve the image path
 		machine.Image = os.ExpandEnv(machine.Image)
@@ -361,7 +405,15 @@ func (c *FreyjaConfiguration) SetValues() (err error) {
 				Name:     DefaultUserName,
 				Password: DefaultUserPassword,
 				Sudo:     false,
-				// TODO generate dynamically an ssh key and set its path on host by default
+				// injection of a public ssh key path in the config.
+				// this path is a symlink to the real location of the public key, because its
+				// content will be uploaded in the authorized keys file of the machine.
+				// the key must be located in the machine's dir.
+				// the key pair is not yet created.
+				// the symlinks of the private and the public key must be created in the user's
+				// home directory.
+				// the symlinks don't exist yet
+				Keys: []string{filepath.Join(userSSHDir, machine.Hostname+"_"+DefaultUserName+SSHPublicKeySuffix)},
 			}
 			machine.Users = users
 		} else {
@@ -372,10 +424,21 @@ func (c *FreyjaConfiguration) SetValues() (err error) {
 				if user.Password == "" {
 					user.Password = DefaultUserPassword
 				}
-				// TODO generate dynamically an ssh key and set its path on host by default if no
-				//   key
-				for k, key := range user.Keys {
-					user.Keys[k] = os.ExpandEnv(key)
+				// if no ssh key is configured for the user, we inject of a public ssh key path in
+				// the config.
+				// this path is a symlink to the real location of the public key, because its
+				// content will be uploaded in the authorized keys file of the machine.
+				// the key must be located in the machine's dir.
+				// the key pair is not yet created.
+				// the symlinks of the private and the public key must be created in the user's
+				// home directory.
+				// the symlinks don't exist yet
+				if len(user.Keys) == 0 {
+					user.Keys = []string{filepath.Join(userSSHDir, machine.Hostname+"_"+user.Name+SSHPublicKeySuffix)}
+				} else {
+					for k, key := range user.Keys {
+						user.Keys[k] = os.ExpandEnv(key)
+					}
 				}
 				machine.Users[j] = user
 			}
@@ -431,11 +494,27 @@ func (c *FreyjaConfiguration) SetValues() (err error) {
 // UTILS
 // *****
 
+// GetMachineDir builds the machine directory path from its configuration
+func (cm *FreyjaConfigurationMachine) GetMachineDir() string {
+	return filepath.Join(FreyjaMachinesWorkspaceDir, cm.Hostname)
+}
+
+// CreateMachineDir returns the created dir, or an error
+func (cm *FreyjaConfigurationMachine) CreateMachineDir() (string, error) {
+	machineDirPath := filepath.Join(FreyjaMachinesWorkspaceDir, cm.Hostname)
+	if _, err := os.Stat(machineDirPath); os.IsNotExist(err) {
+		if err := os.MkdirAll(machineDirPath, os.ModePerm); err != nil {
+			return "", err
+		}
+	}
+	return machineDirPath, nil
+}
+
 // GetLibvirtNetworkAddressSlot will search into the machine networks and will return the slot
 // address in libvirt format such as '0x02'.
 // The two last digits of the address are calculated as follows : hexa(rank in machine networks' list + 2)
-func (m *FreyjaConfigurationMachine) GetLibvirtNetworkAddressSlot(networkName string) (slot string, err error) {
-	for i, network := range m.Networks {
+func (cm *FreyjaConfigurationMachine) GetLibvirtNetworkAddressSlot(networkName string) (slot string, err error) {
+	for i, network := range cm.Networks {
 		if network.Name == networkName {
 			return fmt.Sprintf("0x%02x", i+2), nil
 		}
@@ -447,8 +526,8 @@ func (m *FreyjaConfigurationMachine) GetLibvirtNetworkAddressSlot(networkName st
 // name for cloud init provisioning. This is also the name that the interface will have within the
 // machine once it is started, such as 'enp0s2'.
 // The two last digit of the address is equal to the rank in machine networks' list + 2
-func (m *FreyjaConfigurationMachine) GetCloudInitInterfaceName(networkName string) (slot string, err error) {
-	for i, network := range m.Networks {
+func (cm *FreyjaConfigurationMachine) GetCloudInitInterfaceName(networkName string) (slot string, err error) {
+	for i, network := range cm.Networks {
 		if network.Name == networkName {
 			return fmt.Sprintf("enp0s%d", i+2), nil
 		}
@@ -465,4 +544,9 @@ func GetNetworkConfigByName(name string, networks []FreyjaConfigurationNetwork) 
 		}
 	}
 	return nil, errors.New(fmt.Sprintf("network config '%s' not found", name))
+}
+
+// GetSSHKeysPaths generates the path of a machine's user ssh keys
+func GetSSHKeysPaths(machineDir string, username string) (privateKeyPath string, publicKeyPath string) {
+	return filepath.Join(machineDir, username+SSHPublicKeySuffix), filepath.Join(machineDir, username+SSHPrivateKeySuffix)
 }

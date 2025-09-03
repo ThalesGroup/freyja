@@ -60,6 +60,10 @@ func replaceFirstConfFile(c *configuration.FreyjaConfiguration, f *configuration
 	c.Machines[0].Files[0] = *f
 }
 
+// ********************
+// TEST VALIDATE CONFIG
+// ********************
+
 func TestValidate(t *testing.T) {
 	c := internalTest.BuildCompleteConfig(testFileValidCompleteConfiguration)
 	testValidateVersion(t, c)
@@ -198,24 +202,11 @@ func testValidateMachineNetwork(t *testing.T, c *configuration.FreyjaConfigurati
 // testValidateMachineNetwork calls Validate() with modified machine's user configurations
 func testValidateMachineUser(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationUser := c.Machines[0].Users[0]
-	// invalid
-	configurationUser.Keys = append(configurationUser.Keys, "dumb")
+	// validate the default ssh keys injected in configuration by default
+	configurationUser.Keys = []string{}
 	replaceFirstConfUser(c, &configurationUser)
 	if err := c.Validate(); err == nil {
 		t.Logf("User valid instead of invalid for key values: %v", configurationUser.Keys)
-		t.FailNow()
-	}
-	// valid
-	// validate both the abs path and path with env variables
-	tempFileName := "test-valid-user-key.pub"
-	tempFile := internalTest.WriteTempTestFile(tempFileName, "config", []byte("test"))
-	os.Setenv("TEST_DIR", filepath.Dir(tempFile))
-	tempFileEnv := "$TEST_DIR/" + tempFileName
-	configurationUser.Keys = []string{tempFile, tempFileEnv, "/dev/null"}
-	replaceFirstConfUser(c, &configurationUser)
-	c.SetValues()
-	if err := c.Validate(); err != nil {
-		t.Logf("User invalid instead of valid for key values: %v", configurationUser.Keys)
 		t.FailNow()
 	}
 }
@@ -298,6 +289,10 @@ func testValidateMachineFiles(t *testing.T, c *configuration.FreyjaConfiguration
 
 }
 
+// *****************
+// TEST BUILD CONFIG
+// *****************
+
 func TestBuildEmptyConfiguration(t *testing.T) {
 	//var c internal.Configuration
 	var c configuration.FreyjaConfiguration
@@ -358,7 +353,7 @@ func TestBuildDefaultConfiguration(t *testing.T) {
 			t.Logf("expected empty mac address but got '%s'", mn.Mac)
 		}
 	}
-	// test machine users default values
+	// USERS
 	// Users : freyja:master by default
 	if len(m.Users) != 1 {
 		t.Logf("expected only one user but got '%d'", len(m.Users))
@@ -377,7 +372,12 @@ func TestBuildDefaultConfiguration(t *testing.T) {
 		t.Logf("expected user as sudoer to be false but got true")
 		t.Fail()
 	}
-	// TODO test auto ssh key generation by default
+	ukeys := u.Keys
+	if len(ukeys) != 1 {
+		t.Logf("expected 1 default ssh key path but got %d", len(ukeys))
+	}
+	ukey := ukeys[0]
+	if filepath.Dir(ukey) !=
 	// Storage
 	if m.Storage != configuration.DefaultMachineStorage {
 		t.Logf("expected storage '%d' but got '%d'", configuration.DefaultMachineStorage, m.Storage)
@@ -613,4 +613,40 @@ func TestGetNetworkConfigByName(t *testing.T) {
 		t.Errorf("expected network name '%s' but got '%s'", name, network.Name)
 		t.FailNow()
 	}
+}
+
+// ***************************
+// TEST AUDIT CONFIG PROVISION
+// ***************************
+
+// TODO test audit machine (qcow2 image file)
+
+func TestAudit(t *testing.T) {
+	c := internalTest.BuildCompleteConfig(testFileValidCompleteConfiguration)
+	configurationMachine := c.Machines[0]
+	configurationUser := configurationMachine.Users[0]
+	configurationMachine.Users = configurationMachine.Users[0:1]
+
+	// audit user - inject non-existing ssh keys
+	configurationUser.Keys = []string{"dumb"}
+	replaceFirstConfUser(c, &configurationUser)
+	if err := configurationMachine.Audit(); err == nil {
+		t.Logf("User audit valid instead of invalid for key values: %v", configurationUser.Keys)
+		t.FailNow()
+	}
+
+	// audit user - inject valid ssh keys with env vars
+	tempFileName := "test-valid-user-key.pub"
+	tempFile := internalTest.WriteTempTestFile(tempFileName, "config", []byte("test"))
+	os.Setenv("TEST_DIR", filepath.Dir(tempFile))
+	tempFileEnv := "$TEST_DIR/" + tempFileName
+	configurationUser.Keys = []string{tempFile, tempFileEnv}
+	replaceFirstConfUser(c, &configurationUser)
+	if err := configurationMachine.Audit(); err != nil {
+		t.Logf("User invalid instead of valid for key values: %v", configurationUser.Keys)
+		t.FailNow()
+	}
+
+	// TODO test audit machine files
+
 }

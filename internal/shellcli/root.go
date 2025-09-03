@@ -3,12 +3,13 @@ package shellcli
 import (
 	"embed"
 	"freyja/internal"
-	"github.com/digitalocean/go-libvirt"
-	"github.com/spf13/cobra"
+	"freyja/internal/configuration"
 	"log"
 	"net/url"
 	"os"
-	"path/filepath"
+
+	"github.com/digitalocean/go-libvirt"
+	"github.com/spf13/cobra"
 )
 
 var Logger = internal.Logger
@@ -18,11 +19,6 @@ var verbose bool
 
 // LibvirtConnexion qemu connexion
 var LibvirtConnexion *libvirt.Libvirt
-
-var FreyjaWorkspaceDir = filepath.Join(os.Getenv("HOME"), ".freyja")
-
-var FreyjaMachinesWorkspaceDir = filepath.Join(FreyjaWorkspaceDir, "machines")
-var FreyjaNetworksWorkspaceDir = filepath.Join(FreyjaWorkspaceDir, "networks")
 
 //go:embed templates
 var Templates embed.FS
@@ -66,7 +62,7 @@ func initLibvirtConnexion() *libvirt.Libvirt {
 func initWorkspace() {
 	// check the freyja workspace dir
 	// create if it does not exist
-	if err := os.MkdirAll(FreyjaWorkspaceDir, os.ModePerm); err != nil {
+	if err := os.MkdirAll(configuration.FreyjaWorkspaceDir, os.ModePerm); err != nil {
 		log.Panic("Could not create freyja workspace dir in home user: ", err)
 	}
 }

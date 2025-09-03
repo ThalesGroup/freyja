@@ -9,5 +9,4 @@ machines:
         # "frodo"
         password: "$5$HbI/ywezpw0NiTCP$Zv8x/GUnQ3gQJLez/EQ0BowYpz2VVFJZwNZU9lHGmNC"
         sudo: true
-        keys: # Optional, default '$HOME/.ssh/id_rsa.pub'
-          - "/home/kaio/.ssh/id_ed25519.pub"
+      - name: "frodo"

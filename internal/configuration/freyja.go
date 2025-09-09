@@ -499,6 +499,14 @@ func (cm *FreyjaConfigurationMachine) GetMachineDir() string {
 	return filepath.Join(FreyjaMachinesWorkspaceDir, cm.Hostname)
 }
 
+func GetMachineDirByName(hostname string) (dir string, err error) {
+	dir = filepath.Join(FreyjaMachinesWorkspaceDir, hostname)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return "", fmt.Errorf("machine dir '%s' does not exists", dir)
+	}
+	return dir, nil
+}
+
 // CreateMachineDir returns the created dir, or an error
 func (cm *FreyjaConfigurationMachine) CreateMachineDir() (string, error) {
 	machineDirPath := filepath.Join(FreyjaMachinesWorkspaceDir, cm.Hostname)

@@ -2,10 +2,12 @@ package shellcli
 
 import (
 	"freyja/internal"
-	"github.com/spf13/cobra"
+	"freyja/internal/configuration"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
 
 var deleteDomainName string
@@ -50,10 +52,12 @@ var machineDeleteCmd = &cobra.Command{
 				os.Exit(1)
 			}
 			// delete machine directory in filesystem
-			machineDirPath := getMachineDirByName(deleteDomainName)
+			machineDirPath, err := configuration.GetMachineDirByName(deleteDomainName)
+			if err != nil {
+				Logger.Warn("cannot get machine directory", "machines", deleteDomainName, "reason", err)
+			}
 			if err = os.RemoveAll(machineDirPath); err != nil {
-				Logger.Error("cannot remove machine directory", "machine", deleteDomainName, "dir", machineDirPath, "error", err)
-				os.Exit(1)
+				Logger.Warn("cannot remove machine directory", "machine", deleteDomainName, "dir", machineDirPath, "error", err)
 			}
 			Logger.Info("deleted", "machines", deleteDomainName)
 

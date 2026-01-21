@@ -59,10 +59,31 @@ freyja machine usage vm1 vm2 --watch
 freyja machine usage vm1
 ```
 
+Opens a console in a specific machine :
+
+```sh
+freyja machine console vm1
+```
+
 List mac addresses already in use :
 
 ```sh
 freyja machine info | grep mac
+```
+
+Create a snapshot of a machine :
+```sh
+freyja machine snapshot vm1 snaphost_name
+```
+
+Restore a snapshot of a machine :
+```sh
+freyja machine restore vm1 snaphost_name
+```
+
+List the snapshots of a machine :
+```sh
+freyja machine list-snapshots vm1
 ```
 
 List networks:

@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"crypto/ed25519"
 	b64 "encoding/base64"
 	"errors"
 	"fmt"
@@ -10,8 +9,10 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
+	"syscall"
 
 	"github.com/google/uuid"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 // Prompt
@@ -53,6 +54,15 @@ func AskUserYesNoConfirmation() (choice bool) {
 		}
 	}
 	return agree
+}
+
+// AskPassword asks for the password of a user from stdin
+func AskPassword() (password []byte, err error) {
+	password, err = terminal.ReadPassword(syscall.Stdin)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read password from user input: %w", err)
+	}
+	return password, nil
 }
 
 // ID
@@ -201,3 +211,5 @@ func GetMachineInterfaceFromSlotAddress(slotAddress string) (string, error) {
 // ***
 // SSH
 // ***
+
+

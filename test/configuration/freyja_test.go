@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"fmt"
+	"freyja/internal"
 	"freyja/internal/configuration"
 	internalTest "freyja/test"
 	"log"
@@ -70,7 +71,8 @@ func TestValidate(t *testing.T) {
 	testValidateNetworks(t, c)
 	testValidateMachineImage(t, c)
 	testValidateMachineNetwork(t, c)
-	testValidateMachineUser(t, c)
+	// every user conf is optional for now, so there is nothing to validate yet
+	//testValidateMachineUser(t, c)
 	testValidateMachineFiles(t, c)
 }
 
@@ -199,25 +201,13 @@ func testValidateMachineNetwork(t *testing.T, c *configuration.FreyjaConfigurati
 
 }
 
-// testValidateMachineNetwork calls Validate() with modified machine's user configurations
-func testValidateMachineUser(t *testing.T, c *configuration.FreyjaConfiguration) {
-	configurationUser := c.Machines[0].Users[0]
-	// validate the default ssh keys injected in configuration by default
-	configurationUser.Keys = []string{}
-	replaceFirstConfUser(c, &configurationUser)
-	if err := c.Validate(); err == nil {
-		t.Logf("User valid instead of invalid for key values: %v", configurationUser.Keys)
-		t.FailNow()
-	}
-}
-
 // testValidateMachineNetwork calls Validate() with modified machine's file configurations
 func testValidateMachineFiles(t *testing.T, c *configuration.FreyjaConfiguration) {
 	configurationFile := c.Machines[0].Files[0]
 
 	// SOURCE
 	// invalid values
-	values := []string{"dumb", "/dumb/dumber.txt"}
+	values := []string{""}
 	for _, value := range values {
 		configurationFile.Source = value
 		replaceFirstConfFile(c, &configurationFile)
@@ -228,11 +218,35 @@ func testValidateMachineFiles(t *testing.T, c *configuration.FreyjaConfiguration
 	}
 	// valid values
 	// validate both the abs path and path with env variables
+	// the values don't tell if the file exists, only that the path is right
 	tempFileName := "test-valid-file-source.txt"
 	tempFile := internalTest.WriteTempTestFile(tempFileName, "config", []byte("test"))
 	os.Setenv("TEST_DIR", filepath.Dir(tempFile))
 	tempFileEnv := "$TEST_DIR/" + tempFileName
 	values = []string{tempFile, tempFileEnv, "/dev/null"}
+	for _, value := range values {
+		configurationFile.Source = value
+		replaceFirstConfFile(c, &configurationFile)
+		c.SetValues()
+		if err := c.Validate(); err != nil {
+			t.Logf("Owner invalid instead of valid for value: %s", value)
+			t.Fail()
+		}
+	}
+
+	// DESTINATION
+	// invalid values
+	values = []string{""}
+	for _, value := range values {
+		configurationFile.Source = value
+		replaceFirstConfFile(c, &configurationFile)
+		if err := c.Validate(); err == nil {
+			t.Logf("Source file valid instead of invalid for value: %s", value)
+			t.Fail()
+		}
+	}
+	// valid values
+	values = []string{"dumb1", "/dev/null"}
 	for _, value := range values {
 		configurationFile.Source = value
 		replaceFirstConfFile(c, &configurationFile)
@@ -328,7 +342,7 @@ func TestBuildDefaultConfiguration(t *testing.T) {
 	// test machine default values
 	m := c.Machines[0]
 	// test machine image default value
-	expectedImage := "/tmp/debian-12-generic-amd64.qcow2"
+	expectedImage, _ := internal.GetAbsPath("$HOME/Images/debian12")
 	if m.Image != expectedImage {
 		t.Logf("expected image '%s' but got '%s'", expectedImage, m.Image)
 		t.Fail()
@@ -372,12 +386,12 @@ func TestBuildDefaultConfiguration(t *testing.T) {
 		t.Logf("expected user as sudoer to be false but got true")
 		t.Fail()
 	}
-	ukeys := u.Keys
-	if len(ukeys) != 1 {
-		t.Logf("expected 1 default ssh key path but got %d", len(ukeys))
+	if u.SSHPublicKeys == nil {
+		t.Logf("ssh public key list null but expected in default key path")
 	}
-	ukey := ukeys[0]
-	if filepath.Dir(ukey) !=
+	if len(u.SSHPublicKeys) != 1 {
+		t.Logf("expected 1 SSH public key but got %d", len(u.SSHPublicKeys))
+	}
 	// Storage
 	if m.Storage != configuration.DefaultMachineStorage {
 		t.Logf("expected storage '%d' but got '%d'", configuration.DefaultMachineStorage, m.Storage)
@@ -443,7 +457,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 		t.Fail()
 	}
 	n1 := c.Networks[0]
-	if n1.Name != "ctrlplane" {
+	if n1.Name != "ctrl-plane" {
 		t.Logf("expected network name 'ctrlplane' but got '%s'", n1.Name)
 		t.Fail()
 	}
@@ -452,7 +466,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 		t.Fail()
 	}
 	n2 := c.Networks[1]
-	if n2.Name != "dataplane" {
+	if n2.Name != "data-plane" {
 		t.Logf("expected network name 'dataplane' but got '%s'", n2.Name)
 		t.Fail()
 	}
@@ -507,8 +521,8 @@ func TestBuildCompleteConfig(t *testing.T) {
 	}
 	// user ssh keys
 	u1ExpectedKeys := []string{internalTest.FreyjaUnitTestDirCommon + "/sam.pub", internalTest.FreyjaUnitTestDirCommon + "/ext.pub"}
-	if !compareOrderedStringSlices(u1ExpectedKeys, u1.Keys) {
-		t.Logf("expected user keys '%v' but got '%v'", u1ExpectedKeys, u1.Keys)
+	if !compareOrderedStringSlices(u1ExpectedKeys, u1.SSHPublicKeys) {
+		t.Logf("expected user keys '%v' but got '%v'", u1ExpectedKeys, u1.SSHPublicKeys)
 		t.Fail()
 	}
 	// user groups
@@ -586,7 +600,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 	}
 	// just testing mandatory values of machine 2 to make sure that the 2 machines are considered
 	m2 := c.Machines[1]
-	expectedImage := "/tmp/debian-12-generic-amd64.qcow2"
+	expectedImage := "/tmp/freyja-unit-test/common/image2.qcow2"
 	if m2.Image != expectedImage {
 		t.Logf("expected image '%s' but got '%s'", expectedImage, m2.Image)
 		t.Fail()
@@ -600,7 +614,7 @@ func TestBuildCompleteConfig(t *testing.T) {
 
 func TestGetNetworkConfigByName(t *testing.T) {
 	c := internalTest.BuildCompleteConfig(testFileValidCompleteConfiguration)
-	name := "dataplane"
+	name := "data-plane"
 	network, err := configuration.GetNetworkConfigByName(name, c.Networks)
 	if err != nil {
 		t.Fatalf("error getting network config '%s': %v", name, err)
@@ -628,10 +642,10 @@ func TestAudit(t *testing.T) {
 	configurationMachine.Users = configurationMachine.Users[0:1]
 
 	// audit user - inject non-existing ssh keys
-	configurationUser.Keys = []string{"dumb"}
+	configurationUser.SSHPublicKeys = []string{"dumb"}
 	replaceFirstConfUser(c, &configurationUser)
 	if err := configurationMachine.Audit(); err == nil {
-		t.Logf("User audit valid instead of invalid for key values: %v", configurationUser.Keys)
+		t.Logf("User audit valid instead of invalid for key values: %v", configurationUser.SSHPublicKeys)
 		t.FailNow()
 	}
 
@@ -640,13 +654,17 @@ func TestAudit(t *testing.T) {
 	tempFile := internalTest.WriteTempTestFile(tempFileName, "config", []byte("test"))
 	os.Setenv("TEST_DIR", filepath.Dir(tempFile))
 	tempFileEnv := "$TEST_DIR/" + tempFileName
-	configurationUser.Keys = []string{tempFile, tempFileEnv}
+	configurationUser.SSHPublicKeys = []string{tempFile, tempFileEnv}
 	replaceFirstConfUser(c, &configurationUser)
 	if err := configurationMachine.Audit(); err != nil {
-		t.Logf("User invalid instead of valid for key values: %v", configurationUser.Keys)
+		t.Logf("User invalid instead of valid for key values: %v", configurationUser.SSHPublicKeys)
 		t.FailNow()
 	}
 
 	// TODO test audit machine files
 
 }
+
+// **************
+// TEST PROVISION
+// **************

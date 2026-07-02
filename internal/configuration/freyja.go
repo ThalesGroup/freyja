@@ -13,7 +13,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-const Version string = "0.1.0-beta-go"
+const Version string = "v0.1.0-beta-go"
 
 // DefaultUserName = freyja
 const DefaultUserName string = "freyja"
@@ -120,11 +120,11 @@ type FreyjaConfigurationMachineNetwork struct {
 }
 
 type FreyjaConfigurationUser struct {
-	Name     string   `yaml:"name"`
-	Password string   `yaml:"password"`
-	Sudo     bool     `yaml:"sudo"`
-	Groups   []string `yaml:"groups,omitempty"`
-	Keys     []string `yaml:"keys"`
+	Name          string   `yaml:"name"`
+	Password      string   `yaml:"password"`
+	Sudo          bool     `yaml:"sudo"`
+	Groups        []string `yaml:"groups,omitempty"`
+	SSHPublicKeys []string `yaml:"sshPublicSSHPublicKeys"`
 }
 
 type FreyjaConfigurationFile struct {
@@ -172,8 +172,16 @@ func (c *FreyjaConfiguration) Validate() (err error) {
 
 // ValidateVersion audits the version configuration
 func (c *FreyjaConfiguration) validateVersion() error {
-	if c.Version != Version {
-		return errors.New(fmt.Sprintf("wrong version format : current version is '%s' but found '%s'", Version, c.Version))
+	if c.Version == "" {
+		return errors.New("missing version value")
+	}
+	regex := "^[a-z]*[0-9]+\\.[0-9]+.*$"
+	match, err := regexp.MatchString(regex, c.Version)
+	if err != nil {
+		return fmt.Errorf("cannot verify pattern matching for string '%s': %w", c.Version, err)
+	}
+	if !match {
+		return errors.New(fmt.Sprintf("wrong version format : regex is '%s' but found value '%s'", regex, c.Version))
 	}
 	return nil
 }
@@ -207,11 +215,9 @@ func (c *FreyjaConfiguration) validateMachines() (err error) {
 		if machine.Hostname == "" {
 			return errors.New("missing mandatory machine hostname")
 		}
+		// TODO implement the file not found error in the audit phase
 		if machine.Image == "" {
 			return errors.New("missing mandatory machine image")
-		}
-		if !internal.FileExists(machine.Image) {
-			return fmt.Errorf("image file not found : '%s'", machine.Image)
 		}
 		if len(machine.Networks) != 0 {
 			// verify networks
@@ -327,10 +333,10 @@ func (cm *FreyjaConfigurationMachine) Audit() (err error) {
 }
 
 func (cu *FreyjaConfigurationUser) AuditUser() (err error) {
-	if len(cu.Keys) == 0 {
+	if len(cu.SSHPublicKeys) == 0 {
 		return fmt.Errorf("user '%s' keys is mandatory but found empty", cu.Name)
 	} else {
-		for _, key := range cu.Keys {
+		for _, key := range cu.SSHPublicKeys {
 			absPath, err := internal.GetAbsPath(key)
 			if err != nil {
 				return fmt.Errorf("cannot retrieve absolute path of file '%s' for user '%s'", key, cu.Name)
@@ -413,7 +419,7 @@ func (c *FreyjaConfiguration) SetValues() (err error) {
 				// the symlinks of the private and the public key must be created in the user's
 				// home directory.
 				// the symlinks don't exist yet
-				Keys: []string{filepath.Join(userSSHDir, machine.Hostname+"_"+DefaultUserName+SSHPublicKeySuffix)},
+				SSHPublicKeys: []string{filepath.Join(userSSHDir, machine.Hostname+"_"+DefaultUserName+SSHPublicKeySuffix)},
 			}
 			machine.Users = users
 		} else {
@@ -424,7 +430,7 @@ func (c *FreyjaConfiguration) SetValues() (err error) {
 				if user.Password == "" {
 					user.Password = DefaultUserPassword
 				}
-				// if no ssh key is configured for the user, we inject of a public ssh key path in
+				// if no ssh key is configured for the user, we inject a public ssh key path in
 				// the config.
 				// this path is a symlink to the real location of the public key, because its
 				// content will be uploaded in the authorized keys file of the machine.
@@ -433,12 +439,13 @@ func (c *FreyjaConfiguration) SetValues() (err error) {
 				// the symlinks of the private and the public key must be created in the user's
 				// home directory.
 				// the symlinks don't exist yet
-				if len(user.Keys) == 0 {
-					user.Keys = []string{filepath.Join(userSSHDir, machine.Hostname+"_"+user.Name+SSHPublicKeySuffix)}
-				} else {
-					for k, key := range user.Keys {
-						user.Keys[k] = os.ExpandEnv(key)
+				if len(user.SSHPublicKeys) != 0 {
+					for k, key := range user.SSHPublicKeys {
+						user.SSHPublicKeys[k] = os.ExpandEnv(key)
 					}
+				} else {
+					_, sshPublicKeyPath := GetSSHKeysPaths(machine.Hostname, user.Name)
+					user.SSHPublicKeys = []string{sshPublicKeyPath}
 				}
 				machine.Users[j] = user
 			}
@@ -490,21 +497,13 @@ func (c *FreyjaConfiguration) SetValues() (err error) {
 	return nil
 }
 
-// *****
-// UTILS
-// *****
+// *******
+// METHODS
+// *******
 
 // GetMachineDir builds the machine directory path from its configuration
 func (cm *FreyjaConfigurationMachine) GetMachineDir() string {
 	return filepath.Join(FreyjaMachinesWorkspaceDir, cm.Hostname)
-}
-
-func GetMachineDirByName(hostname string) (dir string, err error) {
-	dir = filepath.Join(FreyjaMachinesWorkspaceDir, hostname)
-	if _, err := os.Stat(dir); os.IsNotExist(err) {
-		return "", fmt.Errorf("machine dir '%s' does not exists", dir)
-	}
-	return dir, nil
 }
 
 // CreateMachineDir returns the created dir, or an error
@@ -543,6 +542,98 @@ func (cm *FreyjaConfigurationMachine) GetCloudInitInterfaceName(networkName stri
 	return "", fmt.Errorf("cannot find '%s' in machine networks", networkName)
 }
 
+// *****
+// UTILS
+// *****
+
+func GetMachineDirByName(hostname string) (dir string, err error) {
+	dir = filepath.Join(FreyjaMachinesWorkspaceDir, hostname)
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return "", fmt.Errorf("machine dir '%s' does not exists", dir)
+	}
+	return dir, nil
+}
+
+// GetKeysContent read the SSH key files in the freyja machine dir for a given user
+// the ssh keys are read from the config because it might have been given by a user, or
+// automatically generated by freyja
+func GetKeysContent(machineName string, username string) (privateKeyContent []byte, publicKeyContent []byte, err error) {
+	// get machine dir
+	machineDir, err := GetMachineDirByName(machineName)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot get machine '%s' directory: %w", machineName, err)
+	}
+	// get keys paths
+	privateKeyPath, publicKeyPath := GetSSHKeysPaths(machineDir, username)
+	if _, err := os.Stat(publicKeyPath); os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("public key file '%s' does not exists", publicKeyPath)
+	} else if _, err := os.Stat(privateKeyPath); os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("private key file '%s' does not exists", privateKeyPath)
+	}
+	// read keys
+	privateKey, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot read private key file '%s': %w", privateKeyPath, err)
+	}
+	publicKey, err := os.ReadFile(publicKeyPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot read public key file '%s': %w", publicKeyPath, err)
+	}
+	return privateKey, publicKey, nil
+}
+
+// GetKeys read the SSH key files in the freyja machine dir for a given user
+// the ssh keys are read from the config because it might have been given by a user, or
+// automatically generated by freyja
+func (cu *FreyjaConfigurationUser) GetKeys(machineName string, username string) (privateKeyContent []byte, publicKeyContent []byte, err error) {
+	// get machine dir
+	machineDir, err := GetMachineDirByName(machineName)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot get machine '%s' directory: %w", machineName, err)
+	}
+	// get keys paths
+	privateKeyPath, publicKeyPath := GetSSHKeysPaths(machineDir, username)
+	if _, err := os.Stat(publicKeyPath); os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("public key file '%s' does not exists", publicKeyPath)
+	} else if _, err := os.Stat(privateKeyPath); os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("private key file '%s' does not exists", privateKeyPath)
+	}
+	// read keys
+	privateKey, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot read private key file '%s': %w", privateKeyPath, err)
+	}
+	publicKey, err := os.ReadFile(publicKeyPath)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot read public key file '%s': %w", publicKeyPath, err)
+	}
+	return privateKey, publicKey, nil
+}
+
+func GetPublicKeyContent(machineName string, username string) ([]byte, error) {
+	machineDir, err := GetMachineDirByName(machineName)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get machine '%s' directory: %w", machineName, err)
+	}
+	_, publicKeyPath := GetSSHKeysPaths(machineDir, username)
+	if _, err := os.Stat(publicKeyPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("public key file '%s' does not exists", publicKeyPath)
+	}
+	return os.ReadFile(publicKeyPath)
+}
+
+func GetPrivateKeyContent(machineName string, username string) ([]byte, error) {
+	machineDir, err := GetMachineDirByName(machineName)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get machine '%s' directory: %w", machineName, err)
+	}
+	_, publicKeyPath := GetSSHKeysPaths(machineDir, username)
+	if _, err := os.Stat(publicKeyPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("public key file '%s' does not exists", publicKeyPath)
+	}
+	return os.ReadFile(publicKeyPath)
+}
+
 // GetNetworkConfigByName look for the network configuration at freyja config file's root with a
 // given name
 func GetNetworkConfigByName(name string, networks []FreyjaConfigurationNetwork) (config *FreyjaConfigurationNetwork, err error) {
@@ -557,4 +648,12 @@ func GetNetworkConfigByName(name string, networks []FreyjaConfigurationNetwork) 
 // GetSSHKeysPaths generates the path of a machine's user ssh keys
 func GetSSHKeysPaths(machineDir string, username string) (privateKeyPath string, publicKeyPath string) {
 	return filepath.Join(machineDir, username+SSHPublicKeySuffix), filepath.Join(machineDir, username+SSHPrivateKeySuffix)
+}
+
+// IsSSHPublicKeyDefault takes a public key path and compare it with the default path
+// of this key if it was generated by default for a given machine and user.
+// return true if the publicKeyPath matches the default path generation
+func IsSSHPublicKeyDefault(machineDir string, username string, publicKeyPath string) bool {
+	_, expectedDefaultPath := GetSSHKeysPaths(machineDir, username)
+	return publicKeyPath == expectedDefaultPath
 }

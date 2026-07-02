@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"freyja/internal"
 	"freyja/internal/configuration"
-	"github.com/spf13/cobra"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/spf13/cobra"
 )
 
 // RemoteProcNetworkSetAutostart is set to handle the int32 flag value for network autostart
@@ -34,7 +35,7 @@ var networkCreateCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		xmlDescriptions, err := GenerateLibvirtNetworksXMLDescriptions(&freyjaConfiguration, FreyjaNetworksWorkspaceDir)
+		xmlDescriptions, err := GenerateLibvirtNetworksXMLDescriptions(&freyjaConfiguration, configuration.FreyjaNetworksWorkspaceDir)
 		if err != nil {
 			Logger.Error("cannot generate networks XML descriptions for Libvirt", "reason", err.Error())
 			os.Exit(1)
@@ -63,7 +64,7 @@ func init() {
 }
 
 func GetLibvirtNetworkDir(networkName string) (path string) {
-	return filepath.Join(FreyjaNetworksWorkspaceDir, networkName)
+	return filepath.Join(configuration.FreyjaNetworksWorkspaceDir, networkName)
 }
 
 func GetLibvirtNetworkDescriptionPath(networkName string) (path string) {

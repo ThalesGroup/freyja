@@ -229,9 +229,9 @@ func (ci *CloudInitUserData) Build(machine *FreyjaConfigurationMachine) error {
 		}
 		ciu.Groups = strings.Join(u.Groups, ",")
 		// key content must be read and injected in cloud init user data
-		if u.Keys != nil {
-			keys := make([]string, len(u.Keys))
-			for j, key := range u.Keys {
+		if u.SSHPublicKeys != nil {
+			keys := make([]string, len(u.SSHPublicKeys))
+			for j, key := range u.SSHPublicKeys {
 				resolvedKeyPath := os.ExpandEnv(key)
 				content, err := os.ReadFile(resolvedKeyPath)
 				if err != nil {

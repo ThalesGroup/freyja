@@ -1,5 +1,5 @@
 ---
-version: v0.1.0-beta
+version: v0.1.0-beta-go
 networks: # optional
   - name: ctrl-plane # MANDATORY for networks
     cidr: 192.168.123.0/24 # MANDATORY for networks
@@ -17,7 +17,7 @@ machines: # MANDATORY, at least one
       - name: "sam" # optional, 'freyja' by default
         password: "$6$6LEpjaxLaT/pu5$wwHsyMlZ2JpHObVJBKGbZUmR5oJ4GocH0zRQYKAuWEwq9ifG4N3Vi/E3ZXTj1bK.QQrOmttA7zIZUIEBaU6Yx." # optional, default 'master'
         sudo: true # optional, 'false' by default
-        keys: # Optional, default '$HOME/.ssh/vm1.pub'
+        sshPublicKeys: # Optional
           - "/tmp/freyja-unit-test/common/sam.pub"
           - "/tmp/freyja-unit-test/common/ext.pub"
         groups: ["group1", "group2"] # optional, empty by default

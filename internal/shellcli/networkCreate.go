@@ -154,9 +154,9 @@ func CreateNetworksInLibvirt(xmlDescriptions map[string][]byte) error {
 					Network: name,
 					Message: err.Error(),
 				})
-			} else {
-				return fmt.Errorf("cannot create network in libvirt: %w", err)
 			}
+
+			return fmt.Errorf("cannot create network in libvirt: %w", err)
 		}
 
 		if err = LibvirtConnexion.NetworkSetAutostart(net, RemoteProcNetworkSetAutostart); err != nil {

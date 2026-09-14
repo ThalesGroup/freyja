@@ -21,7 +21,6 @@ wget 'https://cloud-images.ubuntu.com/releases/22.04/release/ubuntu-22.04-server
 2. Create the virtual machine :
 
 ```sh
-cd freyja
 freyja machine create -c examples/basic.yaml
 freyja machine info
 ```

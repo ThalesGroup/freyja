@@ -10,6 +10,7 @@ bin
 .run
 dist
 troubleshooting.md
+prompt.md
 
 # python
 **/__pycache__/

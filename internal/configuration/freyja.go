@@ -42,7 +42,7 @@ const SSHPublicKeySuffix = "_ed25519.pub"
 
 const SSHPrivateKeySuffix = "_ed25519"
 
-var FreyjaWorkspaceDir = filepath.Join(os.Getenv("HOME"), ".freyja")
+var FreyjaWorkspaceDir = filepath.Join(os.Getenv("HOME"), "freyja")
 
 var FreyjaMachinesWorkspaceDir = filepath.Join(FreyjaWorkspaceDir, "machines")
 
@@ -124,7 +124,7 @@ type FreyjaConfigurationUser struct {
 	Password      string   `yaml:"password"`
 	Sudo          bool     `yaml:"sudo"`
 	Groups        []string `yaml:"groups,omitempty"`
-	SSHPublicKeys []string `yaml:"sshPublicSSHPublicKeys"`
+	SSHPublicKeys []string `yaml:"sshPublicKeys.omitempty"`
 }
 
 type FreyjaConfigurationFile struct {

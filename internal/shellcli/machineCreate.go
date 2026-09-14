@@ -28,6 +28,7 @@ const RootImageFileSuffix string = "-root-image." + BackingImageFormat
 const XMLMachineDescriptionFilename string = "libvirt-domain.xml"
 
 const XMLNetworkDescriptionPrefix string = "libvirt-network-"
+
 const XMLNetworkDescriptionSuffix string = ".xml"
 
 // MachineNetworkConfig is used as metadata struct to deal with the --dry-run option
@@ -142,8 +143,7 @@ func createMachine(configurationPath string) {
 			// first, create the networks for machines, if any
 			Logger.Debug("create machine's networks")
 			if err := CreateNetworksInLibvirt(xmlNetworkDescriptions); err != nil {
-				var alreadyExistsError *internal.NetworkAlreadyExistsError
-				if errors.As(err, &alreadyExistsError) {
+				if alreadyExistsError, ok := errors.AsType[*internal.NetworkAlreadyExistsError](err); ok {
 					Logger.Warn("skipped network creation: already exists", "network", alreadyExistsError.Network)
 				} else {
 					Logger.Error("cannot create networks in Libvirt from XML descriptions", "reason", err.Error())

@@ -7,6 +7,10 @@ logs
 bin
 .build
 .dist
+.run
+dist
+troubleshooting.md
+prompt.md
 
 # python
 **/__pycache__/
@@ -16,6 +20,8 @@ out
 .pytest_cache
 .coverage
 *cov/
+.venv
+dist/
 
 # Docs
 **/*.bkp
@@ -29,3 +35,6 @@ pages/.env.local
 pages/npm-debug.log*
 pages/yarn-debug.log*
 pages/yarn-error.log*
+
+# Golang
+vendor/

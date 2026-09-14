@@ -6,4 +6,4 @@ from pydantic import BaseModel
 class NetworkConfiguration(BaseModel):
     name: str
     address: str
-    interface: Optional[str]
+    interface: Optional[str] = None

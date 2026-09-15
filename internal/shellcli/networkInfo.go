@@ -69,14 +69,14 @@ func init() {
 // do not confuse it with a domain interface
 func getNetworkDescription(networkName string) (netDesc *NetworkDescription, err error) {
 	// get network from name
-	network, err := LibvirtConnexion.NetworkLookupByName(networkName)
+	network, err := LibvirtNetworkConnexion.NetworkLookupByName(networkName)
 	if err != nil {
 		Logger.Error("Cannot lookup network by name using Qemu connexion", "network", networkName)
 		return nil, err
 	}
 
 	// get xml description from network
-	xmlDescription, err := LibvirtConnexion.NetworkGetXMLDesc(network, uint32(libvirt.NetworkXMLInactive))
+	xmlDescription, err := LibvirtNetworkConnexion.NetworkGetXMLDesc(network, uint32(libvirt.NetworkXMLInactive))
 	if err != nil {
 		Logger.Error("Cannot get network XML description", "network", network.Name)
 		return nil, err
@@ -112,7 +112,7 @@ func getNetworkDescription(networkName string) (netDesc *NetworkDescription, err
 	}
 
 	// get the machines using this network
-	machines, err := getNetworkDomains(networkName)
+	machines, err := getNetworkDomains(networkName, netDesc.Bridge)
 	if err != nil {
 		return nil, fmt.Errorf("cannot list all the domains using network '%s': %w", networkName, err)
 	}
@@ -121,8 +121,10 @@ func getNetworkDescription(networkName string) (netDesc *NetworkDescription, err
 	return
 }
 
-// getNetworkDomains list all the domains using the given network
-func getNetworkDomains(networkName string) (machines []NetworkMachine, err error) {
+// getNetworkDomains list all the domains using the given network.
+// The domains run in the session daemon and their interfaces reference the
+// network's host bridge, not the network name, so both are matched.
+func getNetworkDomains(networkName string, bridgeName string) (machines []NetworkMachine, err error) {
 	// get domains
 	domains, err := getDomainsList()
 	if err != nil {
@@ -138,7 +140,7 @@ func getNetworkDomains(networkName string) (machines []NetworkMachine, err error
 		}
 		// in this description, get interfaces descriptions and filter by network name
 		for _, iface := range xmlDescription.Devices.Interfaces {
-			if iface.Source.Network == networkName {
+			if iface.Source.Network == networkName || (bridgeName != "" && iface.Source.Bridge == bridgeName) {
 				machines = append(machines, NetworkMachine{
 					Name: xmlDescription.Name,
 					Mac:  iface.Mac.Address,

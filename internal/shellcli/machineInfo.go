@@ -47,7 +47,7 @@ var machineInfoCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		// get domain by name
-		domain, err := LibvirtConnexion.DomainLookupByName(infoDomainName)
+		domain, err := LibvirtDomainConnexion.DomainLookupByName(infoDomainName)
 		if err != nil {
 			Logger.Error("Cannot lookup domain from qemu connexion", "domain", infoDomainName, "reason", err)
 			os.Exit(1)
@@ -83,7 +83,7 @@ func getDomainXMLDescription(domain libvirt.Domain) (*configuration.XMLDomainDes
 	// DOMAIN
 	domainName := domain.Name
 	// get domain xml description
-	domainDesc, err := LibvirtConnexion.DomainGetXMLDesc(domain, 1)
+	domainDesc, err := LibvirtDomainConnexion.DomainGetXMLDesc(domain, 1)
 	if err != nil {
 		Logger.Error("Cannot get domain XML description", "domain", domainName)
 		return nil, err
@@ -98,27 +98,27 @@ func getDomainXMLDescription(domain libvirt.Domain) (*configuration.XMLDomainDes
 	return &description, err
 }
 
-func getDomainMacIP(domain libvirt.Domain, targetHostInterface string) (mac string, ip string, err error) {
-	// get ip from domain
-	// could also use ARP : domIntAddr, err := LibvirtConnexion.DomainInterfaceAddresses(domain, uint32(libvirt.DomainInterfaceAddressesSrcArp), 0)
-	domIntAddrs, err := LibvirtConnexion.DomainInterfaceAddresses(domain, uint32(libvirt.DomainInterfaceAddressesSrcLease), 0)
+// getDomainIPByMac searches the IP of a machine interface in the DHCP leases of
+// the system daemon's networks, by mac address.
+// The machines run in the session daemon but their interfaces plug into the host
+// bridges of the system daemon's networks, so the DHCP servers delivering their
+// leases belong to the system daemon.
+func getDomainIPByMac(mac string) (ip string, err error) {
+	networks, _, err := LibvirtNetworkConnexion.ConnectListAllNetworks(1, libvirt.ConnectListNetworksActive)
 	if err != nil {
-		return "", "", fmt.Errorf("cannot find '%s' domain interface from device '%s': %w", domain.Name, targetHostInterface, err)
+		return "", fmt.Errorf("cannot list the system daemon's networks: %w", err)
 	}
-	for _, inter := range domIntAddrs {
-		if inter.Name == targetHostInterface {
-			// TODO investigate in case of multiple interfaces per device
-			mac = inter.Hwaddr[0]
-			ip = inter.Addrs[0].Addr
+	for _, network := range networks {
+		leases, _, err := LibvirtNetworkConnexion.NetworkGetDhcpLeases(network, []string{mac}, 1, 0)
+		if err != nil {
+			// the network may not have a DHCP server (no lease API): skip it
+			continue
+		}
+		for _, lease := range leases {
+			return lease.Ipaddr, nil
 		}
 	}
-
-	// handle empty ip
-	if ip == "" {
-		ip = "inactive"
-	}
-
-	return
+	return "", nil
 }
 
 func getDomainShortDescription(domain libvirt.Domain, description *configuration.XMLDomainDescription) (short *machineDescription, err error) {
@@ -126,22 +126,34 @@ func getDomainShortDescription(domain libvirt.Domain, description *configuration
 	var interfaces []machineInterface
 	for _, descriptionIface := range description.Devices.Interfaces {
 		var hostInterface, ip string
-		// if machine is up, we can retrieve the IPs and host interface from libvirt
+		// if machine is up, we can retrieve the host interface from libvirt
 		if descriptionIface.Target != nil {
 			hostInterface = descriptionIface.Target.Device
-			_, ip, err = getDomainMacIP(domain, hostInterface)
+		} else {
+			hostInterface = "not up: machine down"
+		}
+		// the IP is searched in the DHCP leases of the system daemon's networks
+		var mac string
+		if descriptionIface.Mac != nil {
+			mac = descriptionIface.Mac.Address
+			ip, err = getDomainIPByMac(mac)
 			if err != nil {
 				Logger.Error("Cannot get domain network information", "domain", domain.Name)
 				return nil, err
 			}
-		} else {
-			hostInterface = "not up: machine down"
-			ip = "not up: machine down"
+		}
+		if ip == "" {
+			ip = "inactive"
+		}
+		// bridge interfaces do not carry the network name: display the host bridge
+		network := descriptionIface.Source.Network
+		if network == "" {
+			network = descriptionIface.Source.Bridge
 		}
 		machineIface := &machineInterface{
 			HostInterface: hostInterface,
-			Network:       descriptionIface.Source.Network,
-			Mac:           descriptionIface.Mac.Address,
+			Network:       network,
+			Mac:           mac,
 			IP:            ip,
 		}
 		interfaces = append(interfaces, *machineIface)
@@ -152,7 +164,7 @@ func getDomainShortDescription(domain libvirt.Domain, description *configuration
 	for _, diskData := range description.Devices.Disks {
 		// get each disk info for domain
 		if diskData.Device == "disk" {
-			allocation, capacity, _, err := LibvirtConnexion.DomainGetBlockInfo(domain, diskData.Source.File, 0)
+			allocation, capacity, _, err := LibvirtDomainConnexion.DomainGetBlockInfo(domain, diskData.Source.File, 0)
 			if err != nil {
 				Logger.Error("Cannot get domain disk information", "domain", domain.Name)
 				return nil, err

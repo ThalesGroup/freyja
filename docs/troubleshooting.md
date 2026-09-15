@@ -5,34 +5,62 @@ sidebar_position: 7
 
 # Troubleshooting
 
-## libvirt-qemu permission denied on home user
+## Cannot open Qemu system connexion
 
-Creating a VM, you encounter the following error :
-
-```sh
-WARNING  /home/user/freyja-workspace/build/almalinux/almalinux_cloud_init.iso may not be accessible by th
-e hypervisor. You will need to grant the 'handler-qemu' user search permissions for the following directo
-ries: ['/home/user']                                
-ERROR    Cannot access storage file '/home/user/freyja-workspace/build/image/image_snapshot' (as 
-uid:64055, gid:109): Permission denied                                                                   
-Domain installation does not appear to have been successful.
-```
-
-To solve this issue, set ACL of your host :
+Running any freyja command, you encounter the following error :
 
 ```sh
-setacl u:handler-qemu:r $HOME
-getacl -e $HOME
-
-# file: home/user
-# owner: user
-# group: user
-user::rwx
-user:handler-qemu:r             #effective:r
-group::r-x                      #effective:r-x
-mask::r-x
-other::---
+Could not open Qemu system connexion for the networks (the user must be a member of the 'libvirt' group)
 ```
+
+Freyja manages the virtual networks in the privileged libvirt system daemon,
+which only the members of the `libvirt` group can reach. Ask your host admin to
+run :
+
+```sh
+sudo usermod -aG libvirt <user>
+```
+
+Then logout and login again.
+
+## Machine fails to start : bridge helper errors
+
+Creating or starting a machine, Qemu fails with an error such as :
+
+```sh
+failed to communicate with bridge helper: access denied by acl file
+```
+
+or freyja warns :
+
+```sh
+WARN: qemu-bridge-helper is not setuid: the machines cannot plug into the host bridges
+WARN: host bridge not allowed for qemu-bridge-helper: the machine cannot plug into it
+```
+
+The machines run unprivileged and plug their interfaces into the networks' host
+bridges through `qemu-bridge-helper`, which requires a one-time setup by the
+host admin. See the requirements page, section **Rootless setup** :
+
+```sh
+sudo dpkg-statoverride --update --add root libvirt 4750 /usr/lib/qemu/qemu-bridge-helper
+echo 'allow <bridge>' | sudo tee -a /etc/qemu/bridge.conf   # for each freyja bridge
+```
+
+## Network not found
+
+Creating a machine, you encounter the following error :
+
+```sh
+ERROR: cannot start the machine {"machine":"...","reason":"Network not found: no network with matching name 'default'"}
+```
+
+The machine was defined with an old freyja version that referenced the networks
+by name in the session daemon. Delete the machine and create it again : the
+interfaces now plug into the host bridges of the system daemon's networks.
+
+Note that `virsh` targets the system daemon by default : to inspect the machines
+freyja created in your session daemon, use `virsh -c qemu:///session` instead.
 
 ## Qemu unexpectedly closed the monitor
 
@@ -60,7 +88,7 @@ To solve this, you should grant `mmap` permission to `virt-aa-helper` for `libcr
 Update `/etc/apparmor.d/usr.lib.libvirt.virt-aa-helper` with `mmap` permission for `libcrypto` :
 
 ```sh
-echo "  /opt/openssl/lib/libcrypto.so.1.1 m," >> /etc/apparmor.d/usr.lib.handler.virt-aa-helper
+echo "  /opt/openssl/lib/libcrypto.so.1.1 m," >> /etc/apparmor.d/usr.lib.libvirt.virt-aa-helper
 sudo systemctl restart apparmor
 ```
 
@@ -76,7 +104,7 @@ To solve this, you should grant `read` permission for `libvirt` for ignition fil
 Update `/etc/apparmor.d/abstractions/libvirt-qemu` with `read` permission for the Freyja workspace :
 
 ```sh
-echo "  /home/<user>/freyja-workspace/** r," >> /etc/apparmor.d/abstractions/handler-qemu
+echo "  /home/<user>/freyja-workspace/** r," >> /etc/apparmor.d/abstractions/libvirt-qemu
 sudo systemctl restart apparmor
 ```
 

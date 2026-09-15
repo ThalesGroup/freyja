@@ -335,9 +335,20 @@ func TestBuildDefaultConfiguration(t *testing.T) {
 		t.Fail()
 	}
 	// test networks default values
-	if len(c.Networks) != 0 {
-		t.Logf("expected 0 networks %d", len(c.Networks))
+	// the 'default' network is injected at the root level because the machine
+	// relies on it: freyja must be able to create it on the fly
+	if len(c.Networks) != 1 {
+		t.Logf("expected 1 network %d", len(c.Networks))
 		t.Fail()
+	} else {
+		if c.Networks[0].Name != configuration.DefaultNetworkName {
+			t.Logf("expected network name '%s' but got '%s'", configuration.DefaultNetworkName, c.Networks[0].Name)
+			t.Fail()
+		}
+		if c.Networks[0].CIDR != configuration.DefaultNetworkCIDR {
+			t.Logf("expected network CIDR '%s' but got '%s'", configuration.DefaultNetworkCIDR, c.Networks[0].CIDR)
+			t.Fail()
+		}
 	}
 	// test machine default values
 	m := c.Machines[0]
@@ -452,8 +463,14 @@ func TestBuildDefaultFilesConfig(t *testing.T) {
 func TestBuildCompleteConfig(t *testing.T) {
 	c := internalTest.BuildCompleteConfig(testFileValidCompleteConfiguration)
 	// test networks config
-	if len(c.Networks) != 2 {
-		t.Logf("expected 2 networks but got %d", len(c.Networks))
+	// 2 declared networks, plus the 'default' network injected at the root level
+	// because a machine relies on it
+	if len(c.Networks) != 3 {
+		t.Logf("expected 3 networks but got %d", len(c.Networks))
+		t.Fail()
+	}
+	if c.Networks[2].Name != configuration.DefaultNetworkName {
+		t.Logf("expected network name '%s' but got '%s'", configuration.DefaultNetworkName, c.Networks[2].Name)
 		t.Fail()
 	}
 	n1 := c.Networks[0]

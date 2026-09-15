@@ -21,7 +21,7 @@ var machineDeleteCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		// get domain by name
-		domain, err := LibvirtConnexion.DomainLookupByName(deleteDomainName)
+		domain, err := LibvirtDomainConnexion.DomainLookupByName(deleteDomainName)
 		// cancel if the machine is not found
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
@@ -37,7 +37,7 @@ var machineDeleteCmd = &cobra.Command{
 		Logger.Info("delete", "machines", deleteDomainName)
 		if internal.AskUserYesNoConfirmation() {
 			// stop libvirt domain
-			if err = LibvirtConnexion.DomainDestroy(domain); err != nil {
+			if err = LibvirtDomainConnexion.DomainDestroy(domain); err != nil {
 				if strings.Contains(err.Error(), "domain is not running") {
 					Logger.Warn("skipped machine forced shutdown: machine is not running", "machine", deleteDomainName)
 				} else {
@@ -47,7 +47,7 @@ var machineDeleteCmd = &cobra.Command{
 
 			}
 			// undefine libvirt domain
-			if err = LibvirtConnexion.DomainUndefine(domain); err != nil {
+			if err = LibvirtDomainConnexion.DomainUndefine(domain); err != nil {
 				Logger.Error("cannot undefine the machines", "machines", deleteDomainName, "reason", err)
 				os.Exit(1)
 			}

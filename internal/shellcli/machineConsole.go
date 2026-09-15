@@ -38,7 +38,7 @@ func init() {
 
 func OpenConsole(domainName string) (err error) {
 	// get domain by name
-	domain, err := LibvirtConnexion.DomainLookupByName(domainName)
+	domain, err := LibvirtDomainConnexion.DomainLookupByName(domainName)
 	if err != nil {
 		return fmt.Errorf("failed to lookup domain '%s': %w", domainName, err)
 	}
@@ -51,7 +51,7 @@ func OpenConsole(domainName string) (err error) {
 	consoleDeviceName := xmlDescription.Devices.Console[0].Alias.Name
 
 	devName := libvirt.OptString{consoleDeviceName}
-	if err := LibvirtConnexion.DomainOpenConsole(domain, devName, os.Stdout, uint32(libvirt.DomainConsoleSafe)); err != nil {
+	if err := LibvirtDomainConnexion.DomainOpenConsole(domain, devName, os.Stdout, uint32(libvirt.DomainConsoleSafe)); err != nil {
 		return fmt.Errorf("failed to open console '%s' for domain '%s': %w", consoleDeviceName, domainName, err)
 	}
 	return nil

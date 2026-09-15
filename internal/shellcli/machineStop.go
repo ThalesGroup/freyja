@@ -17,8 +17,8 @@ var machineStopCmd = &cobra.Command{
 	TraverseChildren: true, // ensure local flags do not spread to sub commands
 
 	Run: func(cmd *cobra.Command, args []string) {
-		domain, _ := LibvirtConnexion.DomainLookupByName(stopDomainName)
-		if err := LibvirtConnexion.DomainShutdown(domain); err != nil {
+		domain, _ := LibvirtDomainConnexion.DomainLookupByName(stopDomainName)
+		if err := LibvirtDomainConnexion.DomainShutdown(domain); err != nil {
 			if strings.Contains(err.Error(), "not running") {
 				Logger.Warn("Machine is already stopped", "name", stopDomainName)
 				os.Exit(0)

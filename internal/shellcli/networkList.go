@@ -28,7 +28,7 @@ var networkListCmd = &cobra.Command{
 
 func getNetworksList() ([]libvirt.Network, error) {
 	flags := libvirt.ConnectListNetworksActive | libvirt.ConnectListNetworksInactive
-	networks, _, err := LibvirtConnexion.ConnectListAllNetworks(1, flags)
+	networks, _, err := LibvirtNetworkConnexion.ConnectListAllNetworks(1, flags)
 	return networks, err
 }
 

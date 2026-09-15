@@ -29,7 +29,7 @@ var machineListCmd = &cobra.Command{
 
 func getDomainsList() ([]libvirt.Domain, error) {
 	flags := libvirt.ConnectListDomainsActive | libvirt.ConnectListDomainsInactive
-	domains, _, err := LibvirtConnexion.ConnectListAllDomains(1, flags)
+	domains, _, err := LibvirtDomainConnexion.ConnectListAllDomains(1, flags)
 	return domains, err
 }
 
@@ -41,7 +41,7 @@ func printMachinesList(domains []libvirt.Domain) {
 	t.SetHeaders("Name", "Status")
 	// for each domain
 	for _, d := range domains {
-		state, _, _ := LibvirtConnexion.DomainGetState(d, 0)
+		state, _, _ := LibvirtDomainConnexion.DomainGetState(d, 0)
 		t.AddRow(d.Name, getMachineState(state))
 	}
 	t.Render()

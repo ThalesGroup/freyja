@@ -2,6 +2,7 @@ package configuration
 
 import (
 	"encoding/xml"
+	"fmt"
 	"freyja/internal/configuration"
 	"freyja/internal/shellcli"
 	internalTest "freyja/test"
@@ -25,7 +26,12 @@ func TestCreateLibvirtDomainXMLDescription(t *testing.T) {
 	machine := config.Machines[0]
 	overlayTestFile := path.Join(FreyjaUnitTestUtilsDir, shellcli.BackingImageFilename)
 	cloudInitTestFile := path.Join(FreyjaUnitTestUtilsDir, "cloud-init.iso")
-	contentBytes, err := configuration.CreateLibvirtDomainXMLDescription(&machine, overlayTestFile, cloudInitTestFile)
+	// host bridges of the machine's networks, as allocated by the system daemon
+	networkBridges := make(map[string]string, len(machine.Networks))
+	for i, network := range machine.Networks {
+		networkBridges[network.Name] = fmt.Sprintf("%s%d", configuration.FreyjaBridgePrefix, i)
+	}
+	contentBytes, err := configuration.CreateLibvirtDomainXMLDescription(&machine, overlayTestFile, cloudInitTestFile, networkBridges)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -166,16 +172,16 @@ func TestCreateLibvirtDomainXMLDescription(t *testing.T) {
 	// test ctrl plane network interface's domain configuration
 	ctrlNetworkConfig := machine.Networks[0]
 	ctrlPlaneInterfaceDevice := interfaceDevices[0]
-	if ctrlPlaneInterfaceDevice.Type != string(configuration.DeviceInterfaceTypeNetwork) {
-		t.Errorf("ctrl plane interface type should be %s", configuration.DeviceInterfaceTypeNetwork)
+	if ctrlPlaneInterfaceDevice.Type != string(configuration.DeviceInterfaceTypeBridge) {
+		t.Errorf("ctrl plane interface type should be %s", configuration.DeviceInterfaceTypeBridge)
 		t.Fail()
 	}
 	if ctrlPlaneInterfaceDevice.Mac.Address != ctrlNetworkConfig.Mac {
 		t.Errorf("ctrl plane mac address should be %s", ctrlNetworkConfig.Mac)
 		t.Fail()
 	}
-	if ctrlPlaneInterfaceDevice.Source.Network != ctrlNetworkConfig.Name {
-		t.Errorf("ctrl plane network name should be %s", ctrlNetworkConfig.Name)
+	if ctrlPlaneInterfaceDevice.Source.Bridge != networkBridges[ctrlNetworkConfig.Name] {
+		t.Errorf("ctrl plane source bridge should be %s", networkBridges[ctrlNetworkConfig.Name])
 		t.Fail()
 	}
 	ctrlPlaneInterfaceDeviceAddress := ctrlPlaneInterfaceDevice.Address
@@ -203,16 +209,16 @@ func TestCreateLibvirtDomainXMLDescription(t *testing.T) {
 	// test data plane network interface's domain configuration
 	dataNetworkConfig := machine.Networks[1]
 	dataPlaneInterfaceDevice := interfaceDevices[1]
-	if dataPlaneInterfaceDevice.Type != string(configuration.DeviceInterfaceTypeNetwork) {
-		t.Errorf("ctrl plane interface type should be %s", configuration.DeviceInterfaceTypeNetwork)
+	if dataPlaneInterfaceDevice.Type != string(configuration.DeviceInterfaceTypeBridge) {
+		t.Errorf("ctrl plane interface type should be %s", configuration.DeviceInterfaceTypeBridge)
 		t.Fail()
 	}
 	if dataPlaneInterfaceDevice.Mac.Address != dataNetworkConfig.Mac {
 		t.Errorf("ctrl plane mac address should be %s", dataNetworkConfig.Mac)
 		t.Fail()
 	}
-	if dataPlaneInterfaceDevice.Source.Network != dataNetworkConfig.Name {
-		t.Errorf("ctrl plane network name should be %s", dataNetworkConfig.Name)
+	if dataPlaneInterfaceDevice.Source.Bridge != networkBridges[dataNetworkConfig.Name] {
+		t.Errorf("ctrl plane source bridge should be %s", networkBridges[dataNetworkConfig.Name])
 		t.Fail()
 	}
 	dataPlaneInterfaceDeviceAddress := dataPlaneInterfaceDevice.Address
@@ -268,7 +274,8 @@ func TestCreateLibvirtNetworkXMLDescription(t *testing.T) {
 	//  </ip>
 	//</network>
 	network := config.Networks[0]
-	contentBytes, err := configuration.CreateLibvirtNetworkXMLDescription(network)
+	testBridgeName := configuration.FreyjaBridgePrefix + "0"
+	contentBytes, err := configuration.CreateLibvirtNetworkXMLDescription(network, testBridgeName)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,6 +287,11 @@ func TestCreateLibvirtNetworkXMLDescription(t *testing.T) {
 
 	if description.Name != network.Name {
 		t.Errorf("expected network name '%s' but got '%s'", network.Name, description.Name)
+		t.Fail()
+	}
+
+	if description.Bridge == nil || description.Bridge.Name != testBridgeName {
+		t.Errorf("expected network bridge name '%s' but got '%v'", testBridgeName, description.Bridge)
 		t.Fail()
 	}
 

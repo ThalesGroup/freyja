@@ -76,7 +76,7 @@ func deleteNetworksByName(names []string) (err error) {
 	var deletedNetworks []string
 	if internal.AskUserYesNoConfirmation() {
 		for _, name := range names {
-			network, errD := LibvirtConnexion.NetworkLookupByName(name)
+			network, errD := LibvirtNetworkConnexion.NetworkLookupByName(name)
 			if errD = deleteNetworkInLibvirt(network); errD != nil {
 				return fmt.Errorf("cannot delete network in libvirt: %w", &internal.NetworkError{
 					Network: name,
@@ -108,7 +108,7 @@ func deleteNetworksByName(names []string) (err error) {
 // deleteNetworkInLibvirt execute 'destroy' and 'undefine' operations in libvirt for a network
 func deleteNetworkInLibvirt(network libvirt.Network) (err error) {
 	// destroy
-	if err = LibvirtConnexion.NetworkDestroy(network); err != nil {
+	if err = LibvirtNetworkConnexion.NetworkDestroy(network); err != nil {
 		if strings.Contains(err.Error(), "is not active") {
 			Logger.Debug("skipped network destroy phase in libvirt because network was not active", "network", network.Name)
 		} else {
@@ -118,7 +118,7 @@ func deleteNetworkInLibvirt(network libvirt.Network) (err error) {
 			})
 		}
 	}
-	if err = LibvirtConnexion.NetworkUndefine(network); err != nil {
+	if err = LibvirtNetworkConnexion.NetworkUndefine(network); err != nil {
 		// undefine
 		return fmt.Errorf("cannot undefine network '%s' in libvirt: %v", network.Name, err.Error())
 	}

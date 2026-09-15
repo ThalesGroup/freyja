@@ -21,8 +21,19 @@ var Logger = internal.Logger
 // Flags
 var verbose bool
 
-// LibvirtConnexion qemu connexion
-var LibvirtConnexion *libvirt.Libvirt
+// LibvirtDomainConnexion qemu session connexion, used for the domains: the machines run
+// unprivileged, as the user who launched freyja, so their storage can stay in $HOME
+var LibvirtDomainConnexion *libvirt.Libvirt
+
+// LibvirtNetworkConnexion qemu system connexion, used for the virtual networks only.
+// A virtual network cannot run in the unprivileged session daemon (creating the
+// bridge, the dnsmasq process and the firewall rules requires root), so all the
+// networks are managed by the single privileged system daemon and shared between
+// the users. This also rules out IP conflicts between users: each network has one
+// DHCP server delivering unique leases, and libvirt refuses to start a network
+// whose subnet collides with an existing route.
+// The user must be a member of the 'libvirt' group to open this connexion.
+var LibvirtNetworkConnexion *libvirt.Libvirt
 
 //go:embed templates
 var Templates embed.FS
@@ -90,9 +101,9 @@ func startSessionDaemon() (string, error) {
 	}
 	Logger.Debug("starting libvirt session daemon", "daemon", daemon)
 	cmd := exec.Command(daemon, "--daemon", "--timeout=120")
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("cannot start libvirt session daemon '%s': %w", daemon, err)
-	}
+	// a failed spawn is not fatal by itself: a concurrent freyja process may have
+	// won the race and started the daemon first, in which case the socket shows up
+	spawnErr := cmd.Run()
 	// the daemon forks: wait for the session socket to show up
 	socketPath = sessionSocketPath()
 	for i := 0; i < 50; i++ {
@@ -101,6 +112,9 @@ func startSessionDaemon() (string, error) {
 		}
 		time.Sleep(100 * time.Millisecond)
 		socketPath = sessionSocketPath()
+	}
+	if spawnErr != nil {
+		return "", fmt.Errorf("cannot start libvirt session daemon '%s': %w", daemon, spawnErr)
 	}
 	return "", fmt.Errorf("libvirt session daemon started but socket '%s' did not appear", socketPath)
 }
@@ -114,6 +128,17 @@ func initLibvirtConnexion() *libvirt.Libvirt {
 	connexion := libvirt.NewWithDialer(dialers.NewLocal(dialers.WithSocket(socketPath)))
 	if err := connexion.ConnectToURI(libvirt.QEMUSession); err != nil {
 		log.Panic("Could not open Qemu session connexion: ", err)
+	}
+	return connexion
+}
+
+func initLibvirtNetworkConnexion() *libvirt.Libvirt {
+	// the default local dialer targets the privileged system socket
+	// /var/run/libvirt/libvirt-sock, which the members of the 'libvirt' group are
+	// allowed to reach
+	connexion := libvirt.NewWithDialer(dialers.NewLocal())
+	if err := connexion.ConnectToURI(libvirt.QEMUSystem); err != nil {
+		log.Panic("Could not open Qemu system connexion for the networks (the user must be a member of the 'libvirt' group): ", err)
 	}
 	return connexion
 }
@@ -138,17 +163,21 @@ func init() {
 	// Flags
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "Activate debug mode") // version flag only for root command
 
-	// Init libvirt connexion before any commands or flags
-	LibvirtConnexion = initLibvirtConnexion()
+	// Init libvirt connexions before any commands or flags
+	LibvirtDomainConnexion = initLibvirtConnexion()
+	LibvirtNetworkConnexion = initLibvirtNetworkConnexion()
 
 	// Init freyja workspace dir in home user
 	initWorkspace()
 }
 
 func finalize() {
-	// Finalize libvirt connexion
-	if err := LibvirtConnexion.Disconnect(); err != nil {
-		log.Panic("Could not close Qemu connexion: ", err)
+	// Finalize libvirt connexions
+	if err := LibvirtDomainConnexion.Disconnect(); err != nil {
+		log.Panic("Could not close Qemu session connexion: ", err)
+	}
+	if err := LibvirtNetworkConnexion.Disconnect(); err != nil {
+		log.Panic("Could not close Qemu system connexion: ", err)
 	}
 }
 

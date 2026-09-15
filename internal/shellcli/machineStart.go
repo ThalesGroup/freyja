@@ -17,8 +17,8 @@ var machineStartCmd = &cobra.Command{
 	TraverseChildren: true, // ensure local flags do not spread to sub commands
 
 	Run: func(cmd *cobra.Command, args []string) {
-		domain, _ := LibvirtConnexion.DomainLookupByName(startDomainName)
-		if err := LibvirtConnexion.DomainCreate(domain); err != nil {
+		domain, _ := LibvirtDomainConnexion.DomainLookupByName(startDomainName)
+		if err := LibvirtDomainConnexion.DomainCreate(domain); err != nil {
 			if strings.Contains(err.Error(), "already running") {
 				Logger.Warn("Machine is already running", "name", startDomainName)
 				os.Exit(0)

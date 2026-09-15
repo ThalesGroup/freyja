@@ -1,6 +1,7 @@
 package shellcli
 
 import (
+	"encoding/xml"
 	"fmt"
 	"freyja/internal"
 	"freyja/internal/configuration"
@@ -9,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/digitalocean/go-libvirt"
 	"github.com/spf13/cobra"
 )
 
@@ -79,11 +81,17 @@ func GetLibvirtNetworkDescriptionPath(networkName string) (path string) {
 func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfiguration, networksDir string) (xmlDescriptions map[string][]byte, err error) {
 	// create networks
 	xmlDescriptions = make(map[string][]byte, len(config.Networks))
+	// bridge names already in use in the system daemon, to allocate free ones for
+	// the new networks
+	usedBridges, err := listSystemNetworkBridges()
+	if err != nil {
+		return nil, fmt.Errorf("cannot list the bridge names of the existing networks: %w", err)
+	}
 	for _, network := range config.Networks {
 		// check first if a network already exists in libvirt
 		// it prevents updating and overwrite an existing network config that is already used by
 		// running machines
-		foundNet, err := LibvirtConnexion.NetworkLookupByName(network.Name)
+		foundNet, err := LibvirtNetworkConnexion.NetworkLookupByName(network.Name)
 		if err != nil {
 			// ignore error only if it contains the message that the network does not exist
 			// which is the purpose of this command
@@ -99,12 +107,20 @@ func GenerateLibvirtNetworksXMLDescriptions(config *configuration.FreyjaConfigur
 					}
 				}
 
+				// allocate a free bridge name in the freyja range, authorized once by
+				// the host admin in the qemu-bridge-helper ACL file
+				bridgeName, err := allocateFreyjaBridgeName(usedBridges)
+				if err != nil {
+					return nil, fmt.Errorf("cannot allocate a host bridge name for network '%s': %w", network.Name, err)
+				}
+				usedBridges[bridgeName] = true
+
 				// create libvirt network configuration
 				// also store the network configs dump a path in a map to create them later
 				// it is useful in case of a --dry-run generation
-				Logger.Debug("create network XML description for libvirt", "network", network.Name)
+				Logger.Debug("create network XML description for libvirt", "network", network.Name, "bridge", bridgeName)
 				var xmlDescription []byte
-				if xmlDescription, err = configuration.CreateLibvirtNetworkXMLDescription(network); err != nil {
+				if xmlDescription, err = configuration.CreateLibvirtNetworkXMLDescription(network, bridgeName); err != nil {
 					return nil, fmt.Errorf("cannot create the libvirt XML description for network '%s': %w", network.Name, err)
 				}
 
@@ -142,12 +158,12 @@ func CreateNetworksInLibvirt(xmlDescriptions map[string][]byte) error {
 	for name, desc := range xmlDescriptions {
 		Logger.Debug("create network in Libvirt from xml descriptions", "network", name)
 
-		net, err := LibvirtConnexion.NetworkDefineXML(string(desc))
+		net, err := LibvirtNetworkConnexion.NetworkDefineXML(string(desc))
 		if err != nil {
 			return fmt.Errorf("cannot define network in libvirt from xml description: %w", err)
 		}
 
-		if err = LibvirtConnexion.NetworkCreate(net); err != nil {
+		if err = LibvirtNetworkConnexion.NetworkCreate(net); err != nil {
 			if strings.Contains(err.Error(), "Network is already in use") {
 				// network already exists in libvirt
 				return fmt.Errorf("network already created in libvirt: %w", &internal.NetworkAlreadyExistsError{
@@ -159,9 +175,76 @@ func CreateNetworksInLibvirt(xmlDescriptions map[string][]byte) error {
 			return fmt.Errorf("cannot create network in libvirt: %w", err)
 		}
 
-		if err = LibvirtConnexion.NetworkSetAutostart(net, RemoteProcNetworkSetAutostart); err != nil {
+		if err = LibvirtNetworkConnexion.NetworkSetAutostart(net, RemoteProcNetworkSetAutostart); err != nil {
 			Logger.Warn("cannot set network autostart in libvirt. continue.", "reason", err.Error())
 		}
 	}
 	return nil
+}
+
+// getNetworkXMLDescription fetches and parses the XML description of a network
+// of the system daemon
+func getNetworkXMLDescription(network libvirt.Network) (*configuration.XMLNetworkDescription, error) {
+	xmlDescriptionData, err := LibvirtNetworkConnexion.NetworkGetXMLDesc(network, 0)
+	if err != nil {
+		return nil, fmt.Errorf("cannot get the XML description of network '%s': %w", network.Name, err)
+	}
+	var description configuration.XMLNetworkDescription
+	if err := xml.Unmarshal([]byte(xmlDescriptionData), &description); err != nil {
+		return nil, fmt.Errorf("cannot unmarshal the XML description of network '%s': %w", network.Name, err)
+	}
+	return &description, nil
+}
+
+// listSystemNetworkBridges returns the host bridge names used by the networks of
+// the system daemon, active or not
+func listSystemNetworkBridges() (map[string]bool, error) {
+	flags := libvirt.ConnectListNetworksActive | libvirt.ConnectListNetworksInactive
+	networks, _, err := LibvirtNetworkConnexion.ConnectListAllNetworks(1, flags)
+	if err != nil {
+		return nil, err
+	}
+	bridges := make(map[string]bool, len(networks))
+	for _, network := range networks {
+		description, err := getNetworkXMLDescription(network)
+		if err != nil {
+			return nil, err
+		}
+		if description.Bridge != nil && description.Bridge.Name != "" {
+			bridges[description.Bridge.Name] = true
+		}
+	}
+	return bridges, nil
+}
+
+// allocateFreyjaBridgeName returns the first free bridge name of the freyja range
+// ('freyja0' to 'freyja<MaxFreyjaBridges-1>'), the range that the host admin
+// authorizes once in the qemu-bridge-helper ACL file
+func allocateFreyjaBridgeName(usedBridges map[string]bool) (string, error) {
+	for i := 0; i < configuration.MaxFreyjaBridges; i++ {
+		bridgeName := fmt.Sprintf("%s%d", configuration.FreyjaBridgePrefix, i)
+		if !usedBridges[bridgeName] {
+			return bridgeName, nil
+		}
+	}
+	return "", fmt.Errorf("all the '%s0' to '%s%d' bridge names are in use: delete unused networks or extend the range", configuration.FreyjaBridgePrefix, configuration.FreyjaBridgePrefix, configuration.MaxFreyjaBridges-1)
+}
+
+// GetNetworkBridgeName returns the host bridge name of the given network of the
+// system daemon. The machines run in the unprivileged session daemon and cannot
+// reference the system networks by name: their interfaces plug directly into the
+// networks' host bridges through qemu-bridge-helper.
+func GetNetworkBridgeName(networkName string) (string, error) {
+	network, err := LibvirtNetworkConnexion.NetworkLookupByName(networkName)
+	if err != nil {
+		return "", fmt.Errorf("cannot lookup network '%s' in the system daemon: %w", networkName, err)
+	}
+	description, err := getNetworkXMLDescription(network)
+	if err != nil {
+		return "", err
+	}
+	if description.Bridge == nil || description.Bridge.Name == "" {
+		return "", fmt.Errorf("network '%s' has no host bridge", networkName)
+	}
+	return description.Bridge.Name, nil
 }

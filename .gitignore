@@ -11,6 +11,7 @@ bin
 dist
 troubleshooting.md
 prompt.md
+todo.md
 
 # python
 **/__pycache__/

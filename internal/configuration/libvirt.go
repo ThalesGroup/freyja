@@ -146,7 +146,13 @@ const (
 )
 
 const (
+	// DeviceInterfaceTypeNetwork references a network by name: only usable when
+	// the domain runs in the same libvirt daemon as the network
 	DeviceInterfaceTypeNetwork DeviceInterfaceType = "network"
+	// DeviceInterfaceTypeBridge plugs the interface directly into a host bridge:
+	// this is how the session domains reach the system daemon's networks, through
+	// qemu-bridge-helper
+	DeviceInterfaceTypeBridge DeviceInterfaceType = "bridge"
 )
 
 const (
@@ -168,7 +174,7 @@ const (
 	DeviceConsoleTargetTypeSerial DeviceConsoleType = "serial"
 )
 
-const DefaultDeviceInterfaceType = string(DeviceInterfaceTypeNetwork)
+const DefaultDeviceInterfaceType = string(DeviceInterfaceTypeBridge)
 
 const DefaultNetworkForwardMode = string(NetworkForwardModeNat)
 
@@ -190,8 +196,7 @@ var DefaultDeviceInterface = XMLDomainDescriptionDevicesInterface{
 	Type: DefaultDeviceInterfaceType,
 	//Mac: nil,
 	Source: &XMLDomainDescriptionDevicesInterfaceSource{
-		//Bridge: DefaultInterfaceSourceBridge,
-		Network: DefaultInterfaceSourceNetwork,
+		Bridge: DefaultNetworkBridgeName,
 	},
 	Model: &XMLDomainDescriptionDevicesInterfaceModel{
 		Type: DefaultInterfaceModelType,
@@ -435,7 +440,7 @@ type XMLDomainDescriptionDevicesInterfaceMac struct {
 type XMLDomainDescriptionDevicesInterfaceSource struct {
 	XMLName xml.Name `xml:"source"`
 	Bridge  string   `xml:"bridge,attr,omitempty"`
-	Network string   `xml:"network,attr"`
+	Network string   `xml:"network,attr,omitempty"`
 }
 
 type XMLDomainDescriptionDevicesInterfaceTarget struct {
@@ -574,7 +579,12 @@ func generateMachineUUID(machineName string) (string, error) {
 	return fmt.Sprintf("%v", mUUIDRaw), nil
 }
 
-func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFile string, cloudInitIsoFile string) ([]byte, error) {
+// CreateLibvirtDomainXMLDescription builds the domain XML description of a machine.
+// networkBridges maps each machine's network name to the host bridge allocated by
+// the system libvirt daemon: the domain runs in the unprivileged session daemon,
+// which cannot resolve the system networks by name, so its interfaces plug
+// directly into their host bridges (through qemu-bridge-helper).
+func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFile string, cloudInitIsoFile string, networkBridges map[string]string) ([]byte, error) {
 	// TODO: how to generate the unique id ?
 	//  - use '1', '2', ... and store the existing ids in metadata to make sure to not reuse an existing one ?
 	//  - use a uuid ?
@@ -707,11 +717,14 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 			if err != nil {
 				return nil, fmt.Errorf("cannot get libvirt network slot for network '%s': %w", network.Name, err)
 			}
+			bridgeName := networkBridges[network.Name]
+			if bridgeName == "" {
+				return nil, fmt.Errorf("no host bridge resolved for network '%s' of machine '%s'", network.Name, cm.Hostname)
+			}
 			networkInterfaceDevice := XMLDomainDescriptionDevicesInterface{
-				Type: string(DeviceInterfaceTypeNetwork),
+				Type: string(DeviceInterfaceTypeBridge),
 				Source: &XMLDomainDescriptionDevicesInterfaceSource{
-					//Bridge:  DefaultInterfaceSourceBridge,
-					Network: network.Name,
+					Bridge: bridgeName,
 				},
 				Address: &XMLDomainDescriptionDevicesInterfaceAddress{
 					Type: DefaultInterfaceAddressType,
@@ -829,7 +842,11 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 //	</ip>
 //
 // </network>
-func CreateLibvirtNetworkXMLDescription(networkConfiguration FreyjaConfigurationNetwork) (data []byte, err error) {
+// bridgeName explicitly names the host bridge of the network instead of letting
+// libvirt auto-assign a 'virbrN' name: freyja uses its own predictable range
+// ('freyja0', 'freyja1', ...) so that the host admin can authorize it once in
+// /etc/qemu/bridge.conf for qemu-bridge-helper. Empty value lets libvirt decide.
+func CreateLibvirtNetworkXMLDescription(networkConfiguration FreyjaConfigurationNetwork, bridgeName string) (data []byte, err error) {
 	gateway, netmask, dhcpStart, dhcpEnd, err := internal.CalculateSubnetInfo(networkConfiguration.CIDR)
 	xmlNetworkDescriptionIp := &XMLNetworkDescriptionIp{
 		Address: gateway,
@@ -848,6 +865,11 @@ func CreateLibvirtNetworkXMLDescription(networkConfiguration FreyjaConfiguration
 			Mode: string(NetworkForwardModeNat),
 		},
 		Ip: xmlNetworkDescriptionIp,
+	}
+	if bridgeName != "" {
+		xmlNetworkDescription.Bridge = &XMLNetworkDescriptionBridge{
+			Name: bridgeName,
+		}
 	}
 
 	//UUID:    internal.GenerateUUID(),

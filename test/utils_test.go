@@ -235,7 +235,7 @@ func TestGetMachineInterfaceFromSlotAddress(t *testing.T) {
 	expected := "enp0s3"
 	output, err := internal.GetMachineInterfaceFromSlotAddress(input)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 	if output != expected {
 		t.Errorf("expected '%s' but got '%s'", expected, output)
@@ -246,7 +246,7 @@ func TestGetMachineInterfaceFromSlotAddress(t *testing.T) {
 	expected = "enp0s125"
 	output, err = internal.GetMachineInterfaceFromSlotAddress(input)
 	if err != nil {
-		t.Fatalf(err.Error())
+		t.Fatal(err)
 	}
 	if output != expected {
 		t.Errorf("expected '%s' but got '%s'", expected, output)
@@ -269,13 +269,5 @@ func TestGetMachineInterfaceNameFromIndex(t *testing.T) {
 	if output != expected {
 		t.Errorf("expected '%s' but got '%s'", expected, output)
 		t.Fail()
-	}
-}
-
-func TestDeleteme(t *testing.T) {
-	file := "$HOME/.ssh/id_rsa.pub"
-	if !internal.FileExists(file) {
-		t.Errorf("user key file '%s' does not exists", file)
-		t.FailNow()
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/dypflying/go-qcow2lib/qcow2"
 	"github.com/spf13/cobra"
@@ -99,6 +100,30 @@ func createMachine(configurationPath string) {
 		os.Exit(1)
 	}
 
+	// NETWORK LIBVIRT CONF
+	// the networks must exist in libvirt before the machine descriptions are
+	// generated, because the machine interfaces plug into the host bridges that
+	// libvirt allocates for these networks
+	xmlNetworkDescriptions, err := BuildLibvirtNetworksDescription(freyjaConfiguration)
+	if err != nil {
+		Logger.Error("cannot build libvirt network descriptions", "reason", err.Error())
+		os.Exit(1)
+	}
+	if !dryRun {
+		Logger.Debug("create machines' networks")
+		if err := CreateNetworksInLibvirt(xmlNetworkDescriptions); err != nil {
+			if alreadyExistsError, ok := errors.AsType[*internal.NetworkAlreadyExistsError](err); ok {
+				Logger.Warn("skipped network creation: already exists", "network", alreadyExistsError.Network)
+			} else {
+				Logger.Error("cannot create networks in Libvirt from XML descriptions", "reason", err.Error())
+				os.Exit(1)
+			}
+
+		}
+	} else {
+		Logger.Warn("skipped networks creation", "reason", "option --dry-run")
+	}
+
 	var createdMachines []string
 	for _, machine := range freyjaConfiguration.Machines {
 		Logger.Info("create", "machine", machine.Hostname)
@@ -116,17 +141,18 @@ func createMachine(configurationPath string) {
 			os.Exit(1)
 		}
 
-		// DOMAIN LIBVIRT CONF
-		xmlMachineDescription, err := BuildLibvirtMachineDescription(machine, cloudInitIsoFile, overlayFile)
+		// NETWORK HOST BRIDGES
+		networkBridges, err := ResolveNetworkBridges(machine)
 		if err != nil {
-			Logger.Error("cannot build libvirt machine description", "machine", machine.Hostname, "reason", err.Error())
+			Logger.Error("cannot resolve the host bridges of the machine's networks", "machine", machine.Hostname, "reason", err.Error())
 			os.Exit(1)
 		}
+		auditBridgeHelperSetup(networkBridges)
 
-		// NETWORK LIBVIRT CONF
-		xmlNetworkDescriptions, err := BuildLibvirtNetworksDescription(freyjaConfiguration)
+		// DOMAIN LIBVIRT CONF
+		xmlMachineDescription, err := BuildLibvirtMachineDescription(machine, cloudInitIsoFile, overlayFile, networkBridges)
 		if err != nil {
-			Logger.Error("cannot build libvirt network descriptions", "machine", machine.Hostname, "reason", err.Error())
+			Logger.Error("cannot build libvirt machine description", "machine", machine.Hostname, "reason", err.Error())
 			os.Exit(1)
 		}
 
@@ -140,26 +166,14 @@ func createMachine(configurationPath string) {
 
 		// CREATE & START
 		if !dryRun {
-			// first, create the networks for machines, if any
-			Logger.Debug("create machine's networks")
-			if err := CreateNetworksInLibvirt(xmlNetworkDescriptions); err != nil {
-				if alreadyExistsError, ok := errors.AsType[*internal.NetworkAlreadyExistsError](err); ok {
-					Logger.Warn("skipped network creation: already exists", "network", alreadyExistsError.Network)
-				} else {
-					Logger.Error("cannot create networks in Libvirt from XML descriptions", "reason", err.Error())
-					os.Exit(1)
-				}
-
-			}
-
-			// second, define the libvirt domain (machine not started yet)
-			domain, err := LibvirtConnexion.DomainDefineXML(string(xmlMachineDescription))
+			// first, define the libvirt domain (machine not started yet)
+			domain, err := LibvirtDomainConnexion.DomainDefineXML(string(xmlMachineDescription))
 			if err != nil {
 				Logger.Error("cannot define the machine in libvirt from domain XML description", "machine", machine.Hostname, "reason", err.Error())
 				os.Exit(1)
 			}
-			// finally, create the domain (machine startup)
-			err = LibvirtConnexion.DomainCreate(domain)
+			// second, create the domain (machine startup)
+			err = LibvirtDomainConnexion.DomainCreate(domain)
 			if err != nil {
 				Logger.Error("cannot start the machine", "machine", machine.Hostname, "reason", err.Error())
 				os.Exit(1)
@@ -252,13 +266,14 @@ func BuildProvisioningFiles(machine configuration.FreyjaConfigurationMachine) (c
 	return
 }
 
-func BuildLibvirtMachineDescription(machine configuration.FreyjaConfigurationMachine, cloudInitIsoPath string, imageOverlayPath string) (xmlMachineDescription []byte, err error) {
+func BuildLibvirtMachineDescription(machine configuration.FreyjaConfigurationMachine, cloudInitIsoPath string, imageOverlayPath string, networkBridges map[string]string) (xmlMachineDescription []byte, err error) {
 	machineDirPath := machine.GetMachineDir()
 	// create the xml description of the libvirt domain from the machine configuration
 	// also injects the overlay image file for qemu
 	// also injects the cloud init files for startup sequence
+	// also injects the host bridges of the machine's networks for the interfaces
 	Logger.Debug("create machine's XML libvirt description", "machine", machine.Hostname, "parent", machineDirPath)
-	xmlMachineDescription, err = configuration.CreateLibvirtDomainXMLDescription(&machine, imageOverlayPath, cloudInitIsoPath)
+	xmlMachineDescription, err = configuration.CreateLibvirtDomainXMLDescription(&machine, imageOverlayPath, cloudInitIsoPath, networkBridges)
 	if err != nil {
 		return nil, fmt.Errorf("cannot create the libvirt domain XML description from configuration for machine '%s': %w", machine.Hostname, err)
 	}
@@ -274,6 +289,80 @@ func BuildLibvirtMachineDescription(machine configuration.FreyjaConfigurationMac
 
 	return
 
+}
+
+// ResolveNetworkBridges maps each network of the machine to the host bridge that
+// the system libvirt daemon allocated for it. The machine runs in the unprivileged
+// session daemon, which cannot resolve the system networks by name, so its
+// interfaces plug directly into the networks' host bridges.
+func ResolveNetworkBridges(machine configuration.FreyjaConfigurationMachine) (map[string]string, error) {
+	networkBridges := make(map[string]string, len(machine.Networks))
+	for _, network := range machine.Networks {
+		bridgeName, err := GetNetworkBridgeName(network.Name)
+		if err != nil {
+			if dryRun {
+				// the network may legitimately not exist yet, since its creation is
+				// skipped by the --dry-run option
+				Logger.Warn("cannot resolve the network's host bridge", "machine", machine.Hostname, "network", network.Name, "reason", err.Error())
+				networkBridges[network.Name] = "dry-run-unresolved"
+				continue
+			}
+			return nil, fmt.Errorf("cannot resolve the host bridge of network '%s' for machine '%s': %w", network.Name, machine.Hostname, err)
+		}
+		networkBridges[network.Name] = bridgeName
+	}
+	return networkBridges, nil
+}
+
+// BridgeHelperConfPath is the ACL file of qemu-bridge-helper: it must allow every
+// host bridge that the unprivileged machines plug their interfaces into
+const BridgeHelperConfPath = "/etc/qemu/bridge.conf"
+
+// bridgeHelperPaths are the usual locations of qemu-bridge-helper, per distro family
+var bridgeHelperPaths = []string{"/usr/lib/qemu/qemu-bridge-helper", "/usr/libexec/qemu-bridge-helper"}
+
+// auditBridgeHelperSetup warns about a missing host setup for qemu-bridge-helper.
+// The machines run unprivileged in the session daemon and rely on this setuid
+// helper to plug their interfaces into the host bridges of the system daemon's
+// networks. The setup requires root once per host, so freyja only reports the
+// fixes for the admin instead of applying them.
+func auditBridgeHelperSetup(networkBridges map[string]string) {
+	// the helper must run as root, restricted to the 'libvirt' group members
+	for _, helperPath := range bridgeHelperPaths {
+		info, err := os.Stat(helperPath)
+		if err != nil {
+			continue
+		}
+		if info.Mode()&os.ModeSetuid == 0 {
+			Logger.Warn("qemu-bridge-helper is not setuid: the machines cannot plug into the host bridges",
+				"helper", helperPath,
+				"fix (as admin)", fmt.Sprintf("dpkg-statoverride --update --add root libvirt 4750 %s", helperPath))
+		}
+		break
+	}
+	// the ACL file must allow the bridges used by the machine
+	content, err := os.ReadFile(BridgeHelperConfPath)
+	if err != nil {
+		Logger.Warn("cannot read the qemu-bridge-helper ACL file: the machines cannot plug into the host bridges",
+			"path", BridgeHelperConfPath,
+			"fix (as admin)", fmt.Sprintf("echo 'allow <bridge>' >> %s, for %s and each bridge '%s0' to '%s%d'", BridgeHelperConfPath, configuration.DefaultNetworkBridgeName, configuration.FreyjaBridgePrefix, configuration.FreyjaBridgePrefix, configuration.MaxFreyjaBridges-1),
+			"reason", err.Error())
+		return
+	}
+	allowedBridges := make(map[string]bool)
+	for _, line := range strings.Split(string(content), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && fields[0] == "allow" {
+			allowedBridges[fields[1]] = true
+		}
+	}
+	for _, bridgeName := range networkBridges {
+		if !allowedBridges["all"] && !allowedBridges[bridgeName] {
+			Logger.Warn("host bridge not allowed for qemu-bridge-helper: the machine cannot plug into it",
+				"bridge", bridgeName,
+				"fix (as admin)", fmt.Sprintf("echo 'allow %s' >> %s", bridgeName, BridgeHelperConfPath))
+		}
+	}
 }
 
 func BuildLibvirtNetworksDescription(freyjaConfiguration configuration.FreyjaConfiguration) (xmlNetworkDescriptions map[string][]byte, err error) {

@@ -34,6 +34,20 @@ const DefaultNetworkName string = "default"
 
 const DefaultNetworkBridgeName string = "virbr0"
 
+// DefaultNetworkCIDR matches the subnet of the stock libvirt 'default' network,
+// used when freyja must create the 'default' network itself on a fresh host
+const DefaultNetworkCIDR string = "192.168.122.0/24"
+
+// FreyjaBridgePrefix prefixes the host bridge names of the networks created by
+// freyja. Explicit, predictable names allow the host admin to authorize the whole
+// range in /etc/qemu/bridge.conf once, so that unprivileged machines can plug
+// into them through qemu-bridge-helper without any further admin action.
+const FreyjaBridgePrefix string = "freyja"
+
+// MaxFreyjaBridges bounds the 'freyjaN' bridge names to N in [0, MaxFreyjaBridges),
+// the range the host admin is expected to authorize in /etc/qemu/bridge.conf
+const MaxFreyjaBridges int = 10
+
 const DefaultFilePermissions string = "0600"
 
 const DefaultFileOwner string = "root:root"
@@ -359,7 +373,7 @@ func (c *FreyjaConfiguration) BuildFromFile(path string) error {
 	// load file
 	absPath, err := filepath.Abs(path)
 	if err != nil {
-		log.Printf("Cannot get the absolut path of file '%s'", path)
+		log.Printf("Cannot get the absolute path of file '%s'", path)
 		return err
 	}
 	viper.AddConfigPath(absPath)
@@ -494,6 +508,33 @@ func (c *FreyjaConfiguration) SetValues() (err error) {
 
 		c.Machines[i] = machine
 	}
+
+	// The 'default' network may not exist in libvirt on a fresh host.
+	// Declaring it at the configuration's root level, when a machine relies on it,
+	// lets freyja create it on the fly like any user-defined network.
+	// If it already exists in libvirt, its creation is skipped later.
+	defaultNetworkDeclared := false
+	for _, network := range c.Networks {
+		if network.Name == DefaultNetworkName {
+			defaultNetworkDeclared = true
+			break
+		}
+	}
+	if !defaultNetworkDeclared {
+	machinesLoop:
+		for _, machine := range c.Machines {
+			for _, network := range machine.Networks {
+				if network.Name == DefaultNetworkName {
+					c.Networks = append(c.Networks, FreyjaConfigurationNetwork{
+						Name: DefaultNetworkName,
+						CIDR: DefaultNetworkCIDR,
+					})
+					break machinesLoop
+				}
+			}
+		}
+	}
+
 	return nil
 }
 

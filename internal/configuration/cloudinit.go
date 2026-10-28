@@ -3,11 +3,12 @@ package configuration
 import (
 	"fmt"
 	"freyja/internal"
-	"github.com/kdomanski/iso9660"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/kdomanski/iso9660"
+	"gopkg.in/yaml.v3"
 )
 
 const ISOCloudInitFilename string = "cloud-init.iso"
@@ -430,7 +431,7 @@ func GenerateCloudInitConfigs(machine *FreyjaConfigurationMachine, outputDir str
 	// network-config generation
 	var cn CloudInitNetworkConfig
 	if err := cn.Build(machine); err != nil {
-		msg := fmt.Sprintf("cannot build cloud init user data for machine '%s'", machine.Hostname)
+		msg := fmt.Sprintf("cannot build cloud init user data network for machine '%s'", machine.Hostname)
 		return fmt.Errorf(msg, err)
 	}
 	if err := cn.Write(outputDir); err != nil {

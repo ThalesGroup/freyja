@@ -2,6 +2,7 @@ package shellcli
 
 import (
 	"crypto/ed25519"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"freyja/internal"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/dypflying/go-qcow2lib/qcow2"
 	"github.com/spf13/cobra"
+	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v2"
 )
 
@@ -156,14 +158,6 @@ func createMachine(configurationPath string) {
 			os.Exit(1)
 		}
 
-		// create the default ssh keys if needed for each user without an ssh key config
-		//for _, user := range machine.Users {
-		//	if err := GenerateSSHKeyPair(machineDirPath, user.Name); err != nil {
-		//		Logger.Error("cannot create machine SSH key pair for the given user", "machine", machine.Hostname, "user", user.Name, "reason", err.Error())
-		//		os.Exit(1)
-		//	}
-		//}
-
 		// CREATE & START
 		if !dryRun {
 			// first, define the libvirt domain (machine not started yet)
@@ -189,7 +183,6 @@ func createMachine(configurationPath string) {
 
 // BuildProvisioningFiles builds all the necessary files in the machine configuration directory
 // inside
-// TODO create the ssh keys by default
 func BuildProvisioningFiles(machine configuration.FreyjaConfigurationMachine) (cloudInitISOPath string, imageOverlayPath string, err error) {
 	// create machine directory
 	Logger.Debug("create machine dir", "machine", machine.Hostname, "parent", configuration.FreyjaMachinesWorkspaceDir)
@@ -212,6 +205,26 @@ func BuildProvisioningFiles(machine configuration.FreyjaConfigurationMachine) (c
 	machineConfigDumpPath := filepath.Join(machine.GetMachineDir(), "freyja-"+machine.Hostname+"-config-dump.yaml")
 	if err := os.WriteFile(machineConfigDumpPath, machineConfigDumpBytes, 0660); err != nil {
 		return "", "", fmt.Errorf("cannot write freyja '%s' configuration dump: %w", machine.Hostname, err)
+	}
+
+	// Default SSH keys generation.
+	// Prior to this step, during configuration build phase, if no SSH key is provided for a user
+	// in the configuration, a public ssh key path is automatically injected in this user
+	// configuration.
+	// If it is the case, we must create the key pair since it is not created yet.
+	for _, user := range machine.Users {
+		sshPubKeyIsDefault, err := configuration.IsSSHPublicKeyDefault(machine.Hostname, user.Name, user.SSHPublicKeys[0])
+		if err != nil {
+			return "", "", fmt.Errorf("cannot verify if key '%s' is a default generated key: %w", user.SSHPublicKeys[0], err)
+		}
+		if sshPubKeyIsDefault {
+			_, dir := configuration.GetMachineDirByName(machine.Hostname)
+			Logger.Info("generates default SSH keys in machine dir", "dir", dir)
+			if err := GenerateSSHKeyPair(machine.Hostname, user.Name); err != nil {
+				Logger.Error("cannot create machine SSH key pair for the given user", "machine", machine.Hostname, "user", user.Name, "reason", err.Error())
+				os.Exit(1)
+			}
+		}
 	}
 
 	// create cloud init metadata and user data files
@@ -249,19 +262,7 @@ func BuildProvisioningFiles(machine configuration.FreyjaConfigurationMachine) (c
 		return "", "", fmt.Errorf("cannot create overlay image file for machine '%s': %w", machine.Hostname, err)
 	}
 
-	// Default SSH keys generation.
-	// Prior to this step, during configuration build phase, if no SSH key is provided for a user
-	// in the configuration, a public ssh key path is automatically injected in this user
-	// configuration.
-	// If it is the case, we must create the key pair since it is not created yet.
-	for _, user := range machine.Users {
-		if configuration.IsSSHPublicKeyDefault(machineDirPath, user.Name, user.SSHPublicKeys[0]) {
-			if err := GenerateSSHKeyPair(machineDirPath, user.Name); err != nil {
-				Logger.Error("cannot create machine SSH key pair for the given user", "machine", machine.Hostname, "user", user.Name, "reason", err.Error())
-				os.Exit(1)
-			}
-		}
-	}
+
 
 	return
 }
@@ -395,21 +396,65 @@ func createOverlayImage(machine *configuration.FreyjaConfigurationMachine, rootI
 	return overlayFile, nil
 }
 
-// GenerateSSHKeyPair create an ed25519 for a given user, inside the given machine config directory
-func GenerateSSHKeyPair(dir string, username string) (err error) {
-	// create ssh key pair with ed25519 algorithm
-	// we use nil io.Reader to let ed25519 package use crypto/rand by itself
-	publicKey, privateKey, err := ed25519.GenerateKey(nil)
+// SSHPrivateKeyFileMode is required by OpenSSH, which refuses private keys readable by others
+const SSHPrivateKeyFileMode os.FileMode = 0600
+
+const SSHPublicKeyFileMode os.FileMode = 0644
+
+// GenerateSSHKeyPair creates an ed25519 SSH key pair in OpenSSH format for a given user,
+// inside the config directory of the given machine
+func GenerateSSHKeyPair(machineName string, username string) error {
+	comment := fmt.Sprintf("%s@%s", username, machineName)
+	privateKey, publicKey, err := marshalED25519KeyPair(comment)
 	if err != nil {
-		return fmt.Errorf("cannot generate ed25519 public/private key for machine '%s' and user '%s': %w", dir, username, err)
+		return fmt.Errorf("cannot generate ed25519 key pair for machine '%s' and user '%s': %w", machineName, username, err)
 	}
-	publicKeyPath, privateKeyPath := configuration.GetSSHKeysPaths(dir, username)
-	if err := os.WriteFile(publicKeyPath, publicKey, 0660); err != nil {
-		return fmt.Errorf("cannot write ed25519 public key for machine '%s' and user '%s': %w", dir, username, err)
+	privateKeyPath, publicKeyPath, err := configuration.GetSSHKeysPaths(machineName, username)
+	if err != nil {
+		return fmt.Errorf("cannot generate default ssh key paths: %w", err)
 	}
-	if err := os.WriteFile(privateKeyPath, privateKey, 0660); err != nil {
-		return fmt.Errorf("cannot write ed25519 private key: for machine '%s' and user '%s': %w", dir, username, err)
+	if err := writeFileWithMode(privateKeyPath, privateKey, SSHPrivateKeyFileMode); err != nil {
+		return fmt.Errorf("cannot write ed25519 private key for machine '%s' and user '%s': %w", machineName, username, err)
+	}
+	if err := writeFileWithMode(publicKeyPath, publicKey, SSHPublicKeyFileMode); err != nil {
+		return fmt.Errorf("cannot write ed25519 public key for machine '%s' and user '%s': %w", machineName, username, err)
 	}
 
 	return nil
+}
+
+// marshalED25519KeyPair generates an ed25519 key pair and encodes it in OpenSSH formats:
+// the private key as an "OPENSSH PRIVATE KEY" PEM block, and the public key as an
+// authorized_keys line ("ssh-ed25519 <base64> <comment>\n")
+func marshalED25519KeyPair(comment string) (privateKeyPEM []byte, publicKeyLine []byte, err error) {
+	// nil reader: ed25519 uses crypto/rand
+	rawPublicKey, rawPrivateKey, err := ed25519.GenerateKey(nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot generate ed25519 key: %w", err)
+	}
+
+	pemBlock, err := ssh.MarshalPrivateKey(rawPrivateKey, comment)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot encode private key in OpenSSH format: %w", err)
+	}
+	privateKeyPEM = pem.EncodeToMemory(pemBlock)
+
+	sshPublicKey, err := ssh.NewPublicKey(rawPublicKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot encode public key in OpenSSH format: %w", err)
+	}
+	// MarshalAuthorizedKey ends with "\n" and has no comment
+	authorizedKey := strings.TrimSuffix(string(ssh.MarshalAuthorizedKey(sshPublicKey)), "\n")
+	publicKeyLine = []byte(authorizedKey + " " + comment + "\n")
+
+	return privateKeyPEM, publicKeyLine, nil
+}
+
+// writeFileWithMode writes data to path and enforces mode, even if the file already exists
+// (os.WriteFile only applies the mode on creation)
+func writeFileWithMode(path string, data []byte, mode os.FileMode) error {
+	if err := os.WriteFile(path, data, mode); err != nil {
+		return err
+	}
+	return os.Chmod(path, mode)
 }

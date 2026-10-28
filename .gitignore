@@ -12,6 +12,7 @@ dist
 troubleshooting.md
 prompt.md
 todo.md
+.claude
 
 # python
 **/__pycache__/

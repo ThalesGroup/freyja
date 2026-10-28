@@ -465,9 +465,9 @@ func (c *FreyjaConfiguration) SetValues() (err error) {
 			}
 			machine.Networks = networks
 		} else {
-			for _, network := range machine.Networks {
-				if network.Name == "" {
-					network.Name = DefaultNetworkName
+			for j := range machine.Networks {
+				if machine.Networks[j].Name == "" {
+					machine.Networks[j].Name = DefaultNetworkName
 				}
 			}
 		}

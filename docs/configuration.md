@@ -28,7 +28,7 @@ For each host, you may configure :
 | hostname                | Yes             | String       | None                               | Name of the VM host. It **MUST NOT** contain underscores.                                                                                                                           |
 | networks                | No              | List[Object] | `default`                          | List of networks. Each one of them will be used to create a new interface if it does not exist.                                                                                     |
 | networks[].name         | Yes for section | String       | `default`                          | The name of the network.                                                                                                                                                            |
-| networks[].address      | Yes for section | String       | Choosed by libvirt / external DHCP | MAC address of the current network for this host.                                                                                                                                   |
+| networks[].mac          | No              | String       | Chosen by libvirt                  | MAC address of the machine's interface on this network, such as `52:54:00:aa:bb:cc`. It must be unique on the network.                                                              |
 | users                   | No              | List[Object] | `freyja:master`                    | List of users. If none, a default `freyja:master` user is created without an authorized ssh key                                                                                     |
 | users[].username        | No              | String       | `freyja`                           | Username to log into the created VM host.                                                                                                                                           |
 | users[].password        | No              | String       | `master`                           | SHA2 hashed password to log into the created VM host. Use command `mkpasswd -m sha-512` to hash the password                                                                        |
@@ -104,9 +104,9 @@ hosts:
         # If this network does not exist yet, it will be created
         # If this network already exists, it will be attached to the current virtual machine 
       - name: "default"
-        # Mandatory MAC address of the virtual machine inside the current subnetwork domain of handler
-        # The address must be unique in this network
-        address: "52:54:02:aa:aa:aa"
+        # Optional MAC address of the virtual machine inside the current subnetwork domain of handler
+        # The address must be unique in this network. If not set, libvirt chooses one
+        mac: "52:54:02:aa:aa:aa"
         
     # Optional list of files to write on the guest filesystem at boot
     write-files:

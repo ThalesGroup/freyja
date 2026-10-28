@@ -169,6 +169,13 @@ func TestCreateLibvirtDomainXMLDescription(t *testing.T) {
 		t.Errorf("number of interfaces should be 2")
 		t.FailNow()
 	}
+	// every interface must use the virtio model: without it, libvirt emulates a rtl8139 card
+	// that cloud kernels cannot drive
+	for i, interfaceDevice := range interfaceDevices {
+		if interfaceDevice.Model == nil || interfaceDevice.Model.Type != configuration.DefaultInterfaceModelType {
+			t.Errorf("interface %d model should be %s, got %+v", i, configuration.DefaultInterfaceModelType, interfaceDevice.Model)
+		}
+	}
 	// test ctrl plane network interface's domain configuration
 	ctrlNetworkConfig := machine.Networks[0]
 	ctrlPlaneInterfaceDevice := interfaceDevices[0]

@@ -769,9 +769,12 @@ func CreateLibvirtDomainXMLDescription(cm *FreyjaConfigurationMachine, overlayFi
 				},
 				//Target: XMLDomainDescriptionDevicesInterfaceTarget{}, // provide if user conf specifies a host interface
 				//Target: nil,
-				//Model: &XMLDomainDescriptionDevicesInterfaceModel{
-				//	Type: DefaultInterfaceModelType,
-				//},
+				// without a model, libvirt emulates a Realtek rtl8139 card, whose driver is missing
+				// from cloud kernels (e.g. Debian genericcloud images): the machine would have no
+				// network interface. virtio drivers are available in every cloud kernel.
+				Model: &XMLDomainDescriptionDevicesInterfaceModel{
+					Type: DefaultInterfaceModelType,
+				},
 			}
 			if network.Mac != "" {
 				networkInterfaceDevice.Mac = &XMLDomainDescriptionDevicesInterfaceMac{

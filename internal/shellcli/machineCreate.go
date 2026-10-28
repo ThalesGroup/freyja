@@ -126,9 +126,37 @@ func createMachine(configurationPath string) {
 		Logger.Warn("skipped networks creation", "reason", "option --dry-run")
 	}
 
+	// NETWORK HOST BRIDGES
+	// resolved and audited for every machine before creating anything, so that a host
+	// missing the qemu-bridge-helper setup fails fast instead of leaving half-created machines
+	warnBridgeHelperNotSetuid()
+	machinesNetworkBridges := make([]map[string]string, len(freyjaConfiguration.Machines))
+	var usedBridges []string
+	for i, machine := range freyjaConfiguration.Machines {
+		networkBridges, err := ResolveNetworkBridges(machine)
+		if err != nil {
+			Logger.Error("cannot resolve the host bridges of the machine's networks", "machine", machine.Hostname, "reason", err.Error())
+			os.Exit(1)
+		}
+		machinesNetworkBridges[i] = networkBridges
+		for _, bridgeName := range networkBridges {
+			usedBridges = append(usedBridges, bridgeName)
+		}
+	}
+	if err := auditBridgeHelperSetup(BridgeHelperConfPath, usedBridges); err != nil {
+		fix := fmt.Sprintf("see the 'Rootless setup' section of the installation requirements, or allow the bridges '%s' and '%s0' to '%s%d' in %s",
+			configuration.DefaultNetworkBridgeName, configuration.FreyjaBridgePrefix, configuration.FreyjaBridgePrefix, configuration.MaxFreyjaBridges-1, BridgeHelperConfPath)
+		if !dryRun {
+			Logger.Error("the host is not set up to let the machines plug into the host bridges", "reason", err.Error(), "fix (as admin)", fix)
+			os.Exit(1)
+		}
+		Logger.Warn("the host is not set up to let the machines plug into the host bridges", "reason", err.Error(), "fix (as admin)", fix)
+	}
+
 	var createdMachines []string
-	for _, machine := range freyjaConfiguration.Machines {
+	for i, machine := range freyjaConfiguration.Machines {
 		Logger.Info("create", "machine", machine.Hostname)
+		networkBridges := machinesNetworkBridges[i]
 
 		// BUILD PROVISION FILES
 		cloudInitIsoFile, overlayFile, err := BuildProvisioningFiles(machine)
@@ -142,14 +170,6 @@ func createMachine(configurationPath string) {
 			Logger.Error("machine provision files audit failed", "machine", machine.Hostname, "reason", err.Error())
 			os.Exit(1)
 		}
-
-		// NETWORK HOST BRIDGES
-		networkBridges, err := ResolveNetworkBridges(machine)
-		if err != nil {
-			Logger.Error("cannot resolve the host bridges of the machine's networks", "machine", machine.Hostname, "reason", err.Error())
-			os.Exit(1)
-		}
-		auditBridgeHelperSetup(networkBridges)
 
 		// DOMAIN LIBVIRT CONF
 		xmlMachineDescription, err := BuildLibvirtMachineDescription(machine, cloudInitIsoFile, overlayFile, networkBridges)
@@ -170,6 +190,14 @@ func createMachine(configurationPath string) {
 			err = LibvirtDomainConnexion.DomainCreate(domain)
 			if err != nil {
 				Logger.Error("cannot start the machine", "machine", machine.Hostname, "reason", err.Error())
+				// undefine the machine so that a new 'create' does not collide with it;
+				// its dir is kept for debugging and is reused by the next 'create'
+				if undefineErr := LibvirtDomainConnexion.DomainUndefine(domain); undefineErr != nil {
+					Logger.Error("cannot undefine the machine that failed to start", "machine", machine.Hostname, "reason", undefineErr.Error(),
+						"fix", fmt.Sprintf("virsh -c qemu:///session undefine %s", machine.Hostname))
+				} else {
+					Logger.Info("undefined the machine that failed to start, its dir is kept for debugging", "machine", machine.Hostname, "dir", machine.GetMachineDir())
+				}
 				os.Exit(1)
 			}
 			createdMachines = append(createdMachines, machine.Hostname)
@@ -218,8 +246,7 @@ func BuildProvisioningFiles(machine configuration.FreyjaConfigurationMachine) (c
 			return "", "", fmt.Errorf("cannot verify if key '%s' is a default generated key: %w", user.SSHPublicKeys[0], err)
 		}
 		if sshPubKeyIsDefault {
-			_, dir := configuration.GetMachineDirByName(machine.Hostname)
-			Logger.Info("generates default SSH keys in machine dir", "dir", dir)
+			Logger.Info("generates default SSH keys in machine dir", "machine", machine.Hostname, "user", user.Name, "dir", machineDirPath)
 			if err := GenerateSSHKeyPair(machine.Hostname, user.Name); err != nil {
 				Logger.Error("cannot create machine SSH key pair for the given user", "machine", machine.Hostname, "user", user.Name, "reason", err.Error())
 				os.Exit(1)
@@ -305,7 +332,7 @@ func ResolveNetworkBridges(machine configuration.FreyjaConfigurationMachine) (ma
 				// the network may legitimately not exist yet, since its creation is
 				// skipped by the --dry-run option
 				Logger.Warn("cannot resolve the network's host bridge", "machine", machine.Hostname, "network", network.Name, "reason", err.Error())
-				networkBridges[network.Name] = "dry-run-unresolved"
+				networkBridges[network.Name] = unresolvedBridgeName
 				continue
 			}
 			return nil, fmt.Errorf("cannot resolve the host bridge of network '%s' for machine '%s': %w", network.Name, machine.Hostname, err)
@@ -322,48 +349,130 @@ const BridgeHelperConfPath = "/etc/qemu/bridge.conf"
 // bridgeHelperPaths are the usual locations of qemu-bridge-helper, per distro family
 var bridgeHelperPaths = []string{"/usr/lib/qemu/qemu-bridge-helper", "/usr/libexec/qemu-bridge-helper"}
 
-// auditBridgeHelperSetup warns about a missing host setup for qemu-bridge-helper.
-// The machines run unprivileged in the session daemon and rely on this setuid
-// helper to plug their interfaces into the host bridges of the system daemon's
-// networks. The setup requires root once per host, so freyja only reports the
-// fixes for the admin instead of applying them.
-func auditBridgeHelperSetup(networkBridges map[string]string) {
-	// the helper must run as root, restricted to the 'libvirt' group members
+// unresolvedBridgeName stands for a network bridge that cannot be resolved because
+// the network creation was skipped by the --dry-run option
+const unresolvedBridgeName = "dry-run-unresolved"
+
+// maxBridgeHelperACLIncludeDepth stops 'include' loops in the qemu-bridge-helper ACL files
+const maxBridgeHelperACLIncludeDepth = 10
+
+// warnBridgeHelperNotSetuid warns when qemu-bridge-helper is not setuid. It is only a
+// warning since some distros grant the helper its privileges another way (e.g. file
+// capabilities), which freyja cannot check reliably.
+func warnBridgeHelperNotSetuid() {
 	for _, helperPath := range bridgeHelperPaths {
 		info, err := os.Stat(helperPath)
 		if err != nil {
 			continue
 		}
 		if info.Mode()&os.ModeSetuid == 0 {
-			Logger.Warn("qemu-bridge-helper is not setuid: the machines cannot plug into the host bridges",
+			Logger.Warn("qemu-bridge-helper is not setuid: the machines may not plug into the host bridges",
 				"helper", helperPath,
 				"fix (as admin)", fmt.Sprintf("dpkg-statoverride --update --add root libvirt 4750 %s", helperPath))
 		}
-		break
-	}
-	// the ACL file must allow the bridges used by the machine
-	content, err := os.ReadFile(BridgeHelperConfPath)
-	if err != nil {
-		Logger.Warn("cannot read the qemu-bridge-helper ACL file: the machines cannot plug into the host bridges",
-			"path", BridgeHelperConfPath,
-			"fix (as admin)", fmt.Sprintf("echo 'allow <bridge>' >> %s, for %s and each bridge '%s0' to '%s%d'", BridgeHelperConfPath, configuration.DefaultNetworkBridgeName, configuration.FreyjaBridgePrefix, configuration.FreyjaBridgePrefix, configuration.MaxFreyjaBridges-1),
-			"reason", err.Error())
 		return
 	}
-	allowedBridges := make(map[string]bool)
-	for _, line := range strings.Split(string(content), "\n") {
+}
+
+// auditBridgeHelperSetup checks that the qemu-bridge-helper ACL file at aclPath lets the
+// machines plug into the given host bridges. The machines run unprivileged in the session
+// daemon and rely on this setuid helper to plug into the bridges of the system daemon's
+// networks. The ACL file requires root once per host, so freyja only reports the problem
+// for the admin instead of fixing it.
+// It returns an error when the ACL file is missing or does not allow one of the bridges.
+// An ACL file that the user cannot read (but the setuid helper can) is only warned about.
+func auditBridgeHelperSetup(aclPath string, bridges []string) error {
+	acl, err := parseBridgeHelperACL(aclPath)
+	if errors.Is(err, os.ErrPermission) {
+		Logger.Warn("cannot verify that the qemu-bridge-helper ACL file allows the machines' host bridges", "path", aclPath, "reason", err.Error())
+		return nil
+	} else if err != nil {
+		return fmt.Errorf("invalid qemu-bridge-helper ACL file: %w", err)
+	}
+
+	var notAllowed []string
+	checked := make(map[string]bool)
+	for _, bridgeName := range bridges {
+		if bridgeName == unresolvedBridgeName || checked[bridgeName] {
+			continue
+		}
+		checked[bridgeName] = true
+		if !acl.allows(bridgeName) {
+			notAllowed = append(notAllowed, bridgeName)
+		}
+	}
+	if len(notAllowed) > 0 {
+		return fmt.Errorf("the qemu-bridge-helper ACL file '%s' does not allow the host bridges %v (an 'allow' rule must match them and no 'deny' rule)", aclPath, notAllowed)
+	}
+	return nil
+}
+
+// bridgeHelperACL mirrors the access rules of qemu-bridge-helper: a bridge is allowed
+// when an 'allow' rule matches it and no 'deny' rule does, whatever the rules order
+type bridgeHelperACL struct {
+	allowAll bool
+	denyAll  bool
+	allowed  map[string]bool
+	denied   map[string]bool
+}
+
+func (acl *bridgeHelperACL) allows(bridgeName string) bool {
+	isAllowed := acl.allowAll || acl.allowed[bridgeName]
+	isDenied := acl.denyAll || acl.denied[bridgeName]
+	return isAllowed && !isDenied
+}
+
+// parseBridgeHelperACL reads a qemu-bridge-helper ACL file, following its 'include' rules
+func parseBridgeHelperACL(path string) (*bridgeHelperACL, error) {
+	acl := &bridgeHelperACL{allowed: make(map[string]bool), denied: make(map[string]bool)}
+	if err := acl.parseFile(path, 0); err != nil {
+		return nil, err
+	}
+	return acl, nil
+}
+
+// parseFile adds the rules of an ACL file. The syntax is one rule per line among
+// 'allow <bridge|all>', 'deny <bridge|all>' and 'include <file>', '#' starting a comment line.
+// Unknown rules are errors, like for qemu-bridge-helper.
+func (acl *bridgeHelperACL) parseFile(path string, depth int) error {
+	if depth > maxBridgeHelperACLIncludeDepth {
+		return fmt.Errorf("too many nested 'include' rules, stopped at '%s'", path)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	for lineNumber, line := range strings.Split(string(content), "\n") {
 		fields := strings.Fields(line)
-		if len(fields) == 2 && fields[0] == "allow" {
-			allowedBridges[fields[1]] = true
+		if len(fields) == 0 || strings.HasPrefix(fields[0], "#") {
+			continue
+		}
+		if len(fields) != 2 {
+			return fmt.Errorf("'%s' line %d: expected '<allow|deny|include> <argument>', got '%s'", path, lineNumber+1, strings.TrimSpace(line))
+		}
+		rule, argument := fields[0], fields[1]
+		switch rule {
+		case "allow":
+			if argument == "all" {
+				acl.allowAll = true
+			} else {
+				acl.allowed[argument] = true
+			}
+		case "deny":
+			if argument == "all" {
+				acl.denyAll = true
+			} else {
+				acl.denied[argument] = true
+			}
+		case "include":
+			if err := acl.parseFile(argument, depth+1); err != nil {
+				return err
+			}
+		default:
+			return fmt.Errorf("'%s' line %d: unknown rule '%s'", path, lineNumber+1, rule)
 		}
 	}
-	for _, bridgeName := range networkBridges {
-		if !allowedBridges["all"] && !allowedBridges[bridgeName] {
-			Logger.Warn("host bridge not allowed for qemu-bridge-helper: the machine cannot plug into it",
-				"bridge", bridgeName,
-				"fix (as admin)", fmt.Sprintf("echo 'allow %s' >> %s", bridgeName, BridgeHelperConfPath))
-		}
-	}
+	return nil
 }
 
 func BuildLibvirtNetworksDescription(freyjaConfiguration configuration.FreyjaConfiguration) (xmlNetworkDescriptions map[string][]byte, err error) {

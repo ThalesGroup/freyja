@@ -25,17 +25,24 @@ Then logout and login again.
 
 ## Machine fails to start : bridge helper errors
 
-Creating or starting a machine, Qemu fails with an error such as :
+`freyja machine create` stops before creating anything with an error such as :
 
 ```sh
-failed to communicate with bridge helper: access denied by acl file
+ERROR: the host is not set up to let the machines plug into the host bridges {"reason":"invalid qemu-bridge-helper ACL file: open /etc/qemu/bridge.conf: no such file or directory", ...}
+ERROR: the host is not set up to let the machines plug into the host bridges {"reason":"the qemu-bridge-helper ACL file '/etc/qemu/bridge.conf' does not allow the host bridges [freyja0] ...", ...}
 ```
 
 or freyja warns :
 
 ```sh
-WARN: qemu-bridge-helper is not setuid: the machines cannot plug into the host bridges
-WARN: host bridge not allowed for qemu-bridge-helper: the machine cannot plug into it
+WARN: qemu-bridge-helper is not setuid: the machines may not plug into the host bridges
+```
+
+or Qemu fails to start a machine with an error such as :
+
+```sh
+failed to communicate with bridge helper: access denied by acl file
+failed to communicate with bridge helper: stderr=failed to parse default acl file `/etc/qemu/bridge.conf'
 ```
 
 The machines run unprivileged and plug their interfaces into the networks' host
@@ -44,8 +51,14 @@ host admin. See the requirements page, section **Rootless setup** :
 
 ```sh
 sudo dpkg-statoverride --update --add root libvirt 4750 /usr/lib/qemu/qemu-bridge-helper
+sudo mkdir -p /etc/qemu
 echo 'allow <bridge>' | sudo tee -a /etc/qemu/bridge.conf   # for each freyja bridge
 ```
+
+A bridge is allowed when an `allow` rule matches it and no `deny` rule does,
+whatever their order in the file (`include` rules are followed).
+
+With `--dry-run`, freyja only warns about the ACL file instead of stopping.
 
 ## Network not found
 

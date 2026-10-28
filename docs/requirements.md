@@ -73,7 +73,8 @@ sudo dpkg-statoverride --update --add root libvirt 4750 /usr/lib/qemu/qemu-bridg
 # 3. authorize the bridges freyja uses : 'virbr0' for the stock 'default'
 #    network, and the predictable 'freyja0' to 'freyja9' range for the
 #    networks freyja creates on the fly
-sudo mkdir -p /etc/qemu { echo 'allow virbr0'; for i in $(seq 0 9); do echo "allow freyja$i"; done; } | sudo tee /etc/qemu/bridge.conf
+sudo mkdir -p /etc/qemu
+{ echo 'allow virbr0'; for i in $(seq 0 9); do echo "allow freyja$i"; done; } | sudo tee /etc/qemu/bridge.conf
 ```
 
 :::warning

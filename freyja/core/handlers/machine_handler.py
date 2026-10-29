@@ -83,7 +83,7 @@ class MachineHandler:
         """
         # USING DICT ON PURPOSE
         # We want to enrich the configuration with dynamic values
-        configuration_dict = self.configuration.dict()
+        configuration_dict = self.configuration.model_dump()
         # enrich with images root dir
         configuration_dict['image_dir'] = self.build_dir
         # enrich with provisioning

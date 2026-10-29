@@ -21,8 +21,8 @@ Domain installation does not appear to have been successful.
 To solve this issue, set ACL of your host :
 
 ```sh
-setacl u:libvirt-qemu:r $HOME
-getacl -e $HOME
+setfacl -m u:libvirt-qemu:x "$HOME"
+getfacl -e "$HOME"
 
 # file: home/user
 # owner: user

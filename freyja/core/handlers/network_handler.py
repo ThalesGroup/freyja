@@ -25,7 +25,7 @@ class NetworkHandler:
 
     def __init__(self, configuration: NetworkConfiguration, build_dir: Path):
         self.name = configuration.name
-        self.configuration = configuration.dict()
+        self.configuration = configuration.model_dump()
         self.configuration_file = build_dir / f"{configuration.name}_{configuration.address}_" \
                                               f"{FreyjaEnvironment.NETWORK_FILENAME}"
 

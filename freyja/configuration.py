@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import List
 
 import yaml
-from pydantic import BaseModel, ValidationError, validator
+from pydantic import BaseModel, ValidationError, field_validator
 from yaml import YAMLError
 
 from freyja.lib.exceptions.configuration_exceptions import ConfigurationContentError, \
@@ -17,7 +17,8 @@ class Configuration(BaseModel):
     version: str
     hosts: List[MachineConfiguration]
 
-    @validator('version')
+    @field_validator('version')
+    @classmethod
     def check_version(cls, version):
         if version not in SUPPORTED_VERSIONS:
             raise ConfigurationVersionError(message=f"The configuration version is not supported. "
@@ -37,7 +38,7 @@ class Configuration(BaseModel):
 
         with open(file, "r") as f:
             try:
-                return cls.parse_obj(yaml.safe_load(f.read()))
+                return cls.model_validate(yaml.safe_load(f.read()))
             except YAMLError as e:
                 raise ConfigurationFormatError(f"Unexpected configuration format. Expected YAML "
                                                f"for file '{file}'", e.args)

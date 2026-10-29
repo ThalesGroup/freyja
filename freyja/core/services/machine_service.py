@@ -217,7 +217,7 @@ def info_machines(names: List[str]) -> "Dict":
         list(filter(None, list_machines(names=True, stdout=False)))
     for domain in domains:
         try:
-            result[domain] = get_domain_info(domain).dict()
+            result[domain] = get_domain_info(domain).model_dump()
         except ChildProcessError as e:
             if check_message(e, "failed to get domain"):
                 logger.warning(f"Skip {domain}: Machine not found")
@@ -245,7 +245,7 @@ def get_usages(usages: Dict[str, Dict], sleep_seconds: int):
             mem_report = execute(["virsh", "dommemstat", domain, "--live"])
             parsed_report = parse_stats(mem_report, header=False)
             used_mem_kib = int(parsed_report.get("rss"))
-            static['used_mem_bytes'] = convert_size(used_mem_kib * 1000)
+            static['used_mem_bytes'] = convert_size(used_mem_kib * 1024)
             static['used_mem'] = round(float(used_mem_kib * 100 / int(parsed_report.get("actual"))))
             # cpu
             cpu_report_0 = execute(["virsh", "cpu-stats", domain, "--total"])
@@ -284,6 +284,9 @@ def display_report(static: bool, usages: Dict[str, Dict], stdscr: Optional = Non
                    static
     """
     i = 0
+    if not static:
+        # clear the lines of the previous refresh, e.g. usages of a machine that just stopped
+        stdscr.erase()
     for domain, usage in usages.items():
         running: bool = bool(usage.get("running"))
         state = "\trunning: " + str(usage.get("running"))
@@ -300,21 +303,18 @@ def display_report(static: bool, usages: Dict[str, Dict], stdscr: Optional = Non
                 print(mem_bytes)
         else:
             stdscr.addstr(i, 0, domain + ":")
-            stdscr.addstr(i + 1, 0, cpu + "\t")
-            stdscr.addstr(i + 2, 0, mem + "\t")
-            stdscr.addstr(i + 3, 0, mem_bytes + "\t")
+            stdscr.addstr(i + 1, 0, state + "\t")
+            if running:
+                stdscr.addstr(i + 2, 0, cpu + "\t")
+                stdscr.addstr(i + 3, 0, mem + "\t")
+                stdscr.addstr(i + 4, 0, mem_bytes + "\t")
             stdscr.refresh()
-            i += 4
+            i += 5
 
 
 def usage_machine(names: List[str], watch: bool = False):
     domains: List[str] = names if names else \
         list(filter(None, list_machines(names=True, stdout=False)))
-    # display
-    if watch:
-        stdscr = curses.initscr()
-        curses.noecho()
-        curses.cbreak()
     # collect static info
     static_usages: Dict[str, Dict] = {}
     for domain in domains:
@@ -329,16 +329,23 @@ def usage_machine(names: List[str], watch: bool = False):
             else:
                 raise e
 
-    # collect and display live info
-    while True:
-        usages = get_usages(static_usages, 1)
-        if watch:
-            display_report(False, usages, stdscr)
-        else:
-            display_report(True, usages)
-            break
-
+    # display
     if watch:
-        curses.nocbreak()
-        curses.echo()
-        curses.endwin()
+        stdscr = curses.initscr()
+        curses.noecho()
+        curses.cbreak()
+    # collect and display live info
+    # restore the terminal even when the watch is interrupted (Ctrl+C) or fails
+    try:
+        while True:
+            usages = get_usages(static_usages, 1)
+            if watch:
+                display_report(False, usages, stdscr)
+            else:
+                display_report(True, usages)
+                break
+    finally:
+        if watch:
+            curses.nocbreak()
+            curses.echo()
+            curses.endwin()
